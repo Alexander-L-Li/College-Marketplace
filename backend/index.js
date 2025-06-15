@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const pool = require("./db");
+const bcrypt = require("bcrypt");
 
 require("dotenv").config();
 app.use(express.json());
@@ -35,11 +36,12 @@ app.post("/register", async (req, res) => {
   const college = email.split("@")[1].split(".")[0];
 
   try {
+    const hashed_password = await bcrypt.hash(password, 10);
     const newUser = await pool.query(
       `INSERT INTO users (first_name, last_name, email, college, password)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [first_name, last_name, email, college, password]
+      [first_name, last_name, email, college, hashed_password]
     );
 
     res.json(newUser.rows[0]);
