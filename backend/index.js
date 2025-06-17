@@ -50,3 +50,28 @@ app.post("/register", async (req, res) => {
     res.status(500).send("Registration failed");
   }
 });
+
+app.post("/login", async (req, res) => {
+  const { email_entry, password_entry } = req.body;
+
+  try {
+    const result = await pool.query(
+      `SELECT password FROM users WHERE email = $1`,
+      [email_entry]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found");
+    }
+
+    const match = await bcrypt.compare(password_entry, result.rows[0].password);
+    if (match) {
+      return res.status(200).send("Login successful");
+    } else {
+      return res.status(401).send("Invalid password");
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(401).send("User does not exist");
+  }
+});
