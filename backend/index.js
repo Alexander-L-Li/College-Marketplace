@@ -46,7 +46,6 @@ app.post("/register", async (req, res) => {
        RETURNING *`,
       [first_name, last_name, email, college, hashed_password]
     );
-
     res.json(newUser.rows[0]);
   } catch (err) {
     console.error(err);
@@ -69,12 +68,14 @@ app.post("/login", async (req, res) => {
 
     const match = await bcrypt.compare(password_entry, result.rows[0].password);
     if (match) {
-      return res.status(200).send("Login successful");
+      return res
+        .status(200)
+        .json({ token: "fake-session-token", email: email_entry });
     } else {
-      return res.status(401).send("Invalid password");
+      return res.status(401).json({ message: "Invalid password" });
     }
   } catch (err) {
     console.error(err);
-    res.status(401).send("User does not exist");
+    res.status(401).json({ message: "User does not exist" });
   }
 });

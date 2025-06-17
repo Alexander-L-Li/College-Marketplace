@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -18,11 +20,13 @@ function Login() {
           password_entry: password,
         }),
       });
-      const text = await res.text();
+      const data = await res.json();
       if (res.ok) {
+        localStorage.setItem("session", data.token);
         setMessage("Login successful!");
+        window.location.href = "/home";
       } else {
-        setMessage(text || "Login failed");
+        setMessage(data?.message || "Login failed");
       }
     } catch (err) {
       setMessage("Network error");
