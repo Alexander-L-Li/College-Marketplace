@@ -7,14 +7,14 @@ function Home() {
   useEffect(() => {
     const session = localStorage.getItem("session");
     if (!session) {
-      navigate("/login");
+      navigate("/");
     }
   }, [navigate]);
 
   async function handleLogout(e) {
     e.preventDefault();
     localStorage.removeItem("session");
-    navigate("/login");
+    navigate("/");
   }
 
   return (
