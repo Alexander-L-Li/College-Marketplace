@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
   const [mode, setMode] = useState("register");
@@ -14,6 +15,7 @@ const Landing = () => {
     setIsLoading(true);
     setMessage("");
 
+    const navigate = useNavigate();
     const endpoint = mode === "register" ? "/register" : "/login";
     const payload =
       mode === "register"
@@ -32,10 +34,11 @@ const Landing = () => {
         if (mode === "login") {
           const json = JSON.parse(data);
           localStorage.setItem("session", json.token);
-          window.location.href = "/home";
+          navigate("/home");
         } else {
           setMessage("Registration successful! Please log in.");
           setMode("login");
+
           // Clear form fields after successful registration
           setFirstName("");
           setLastName("");
