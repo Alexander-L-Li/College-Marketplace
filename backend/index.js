@@ -11,23 +11,23 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-app.get("/ping", (req, res) => {
-  res.send("pong");
-});
+// app.get("/ping", (req, res) => {
+//   res.send("pong");
+// });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-app.get("/db-test", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.send(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Database error");
-  }
-});
+// app.get("/db-test", async (req, res) => {
+//   try {
+//     const result = await pool.query("SELECT NOW()");
+//     res.send(result.rows[0]);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).send("Database error");
+//   }
+// });
 
 app.post("/register", async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
@@ -49,7 +49,7 @@ app.post("/register", async (req, res) => {
     res.json(newUser.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).send("Registration failed");
+    res.status(500).send("Account already exists, please log in!");
   }
 });
 
