@@ -63,7 +63,7 @@ app.post("/login", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).send("User not found");
+      return res.status(404).send("User not found.");
     }
 
     const match = await bcrypt.compare(password_entry, result.rows[0].password);
@@ -72,10 +72,10 @@ app.post("/login", async (req, res) => {
         .status(200)
         .json({ token: "fake-session-token", email: email_entry });
     } else {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "Invalid password." });
     }
   } catch (err) {
     console.error(err);
-    res.status(401).json({ message: "User does not exist" });
+    res.status(401).send("User does not exist.");
   }
 });

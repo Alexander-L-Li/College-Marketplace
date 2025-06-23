@@ -10,12 +10,14 @@ const Landing = () => {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
 
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const endpoint = mode === "register" ? "/register" : "/login";
     const payload =
       mode === "register"
