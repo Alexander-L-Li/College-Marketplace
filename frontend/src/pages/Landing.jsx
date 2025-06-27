@@ -17,7 +17,6 @@ const Landing = () => {
     setIsLoading(true);
     setMessage("");
 
-    // const navigate = useNavigate();
     const endpoint = mode === "register" ? "/register" : "/login";
     const payload =
       mode === "register"
