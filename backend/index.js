@@ -44,7 +44,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// Login user
+// Login the user
 app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
