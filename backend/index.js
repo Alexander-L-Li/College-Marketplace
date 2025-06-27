@@ -15,16 +15,7 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-// app.get("/db-test", async (req, res) => {
-//   try {
-//     const result = await pool.query("SELECT NOW()");
-//     res.send(result.rows[0]);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).send("Database error");
-//   }
-// });
-
+// Register the user
 app.post("/register", async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
 
@@ -45,10 +36,15 @@ app.post("/register", async (req, res) => {
     res.json(newUser.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).send("Account already exists, please log in!");
+    if (err.code == "23505") {
+      res.status(500).send("Account already exists, please log in!");
+    } else {
+      res.status(500).send("Network error.");
+    }
   }
 });
 
+// Login user
 app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
@@ -72,8 +68,41 @@ app.post("/login", async (req, res) => {
     }
   } catch (err) {
     console.error(err);
-    res.status(401).send("User does not exist.");
+    res.status(500).send("Server error.");
   }
 });
 
-app.get("listings", async (req, res) => {});
+// Fetch listings with search and sort
+app.get("/listings", async (req, res) => {
+  const { search, sort } = req.query;
+
+  try {
+    let baseQuery = "SELECT * FROM listings";
+    let values = [];
+    let conditions = [];
+    let sortQuery = "ORDER BY posted_at DESC";
+
+    if (search) {
+      conditions.push("(name ILIKE $1 OR description ILIKE $1)");
+      values.push(`%${search}%`);
+    }
+
+    const allowedSortFields = ["price", "name", "posted_at"];
+
+    if (sort && allowedSortFields.includes(sort)) {
+      sortQuery = `ORDER BY ${sort} ASC`;
+    }
+
+    if (conditions.length) {
+      baseQuery += " WHERE " + conditions.join(" AND ");
+    }
+
+    const finalQuery = baseQuery + " " + sortQuery;
+
+    const result = await pool.query(finalQuery, values);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error");
+  }
+});
