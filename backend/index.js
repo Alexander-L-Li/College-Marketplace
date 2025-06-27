@@ -11,10 +11,6 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-// app.get("/ping", (req, res) => {
-//   res.send("pong");
-// });
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
@@ -79,3 +75,5 @@ app.post("/login", async (req, res) => {
     res.status(401).send("User does not exist.");
   }
 });
+
+app.get("listings", async (req, res) => {});
