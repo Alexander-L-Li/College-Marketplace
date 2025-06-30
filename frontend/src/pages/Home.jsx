@@ -16,7 +16,7 @@ function Home() {
         const res = await fetch("http://localhost:3001/listings");
         const data = await res.json();
         setListings(data);
-        console.log(listings); // delete this later
+        console.log(data); // delete this later
       } catch (err) {
         console.error(err);
       }
