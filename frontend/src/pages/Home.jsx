@@ -1,14 +1,28 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
+  const [listings, setListings] = useState([]);
 
   useEffect(() => {
     const session = localStorage.getItem("session");
     if (!session) {
       navigate("/");
     }
+
+    async function fetchListings() {
+      try {
+        const res = await fetch("http://localhost:3001/listings");
+        const data = await res.json();
+        setListings(data);
+        console.log(listings); // delete this later
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    fetchListings();
   }, [navigate]);
 
   async function handleLogout(e) {
