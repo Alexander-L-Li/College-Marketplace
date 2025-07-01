@@ -32,22 +32,19 @@ function Home() {
   }
 
   return (
-    // <div className="p-4 text-black">
-    //   <h1 className="text-xl font-bold">Welcome to Dorm Drop!</h1>
-    //   <p>This page is protected and only visible if you're logged in.</p>
-    //   <form onSubmit={handleLogout} className="space-y-4">
-    //     <button
-    //       type="submit"
-    //       className="w-full p-2 bg-black text-white rounded hover:bg-gray-800"
-    //     >
-    //       Logout
-    //     </button>
-    //   </form>
-    // </div>
-    <div>
-      {listings.map((item, index) => (
-        <div key={index}>{/* Your Tailwind card design here */}</div>
-      ))}
+    <div className="min-h-screen bg-white px-4 py-6">
+      <div className="max-w-md mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-black mb-2">Dorm Drop</h1>
+          <p className="text-gray-600 text-sm">MIT Campus Marketplace</p>
+        </div>
+      </div>
+      <div>
+        {listings.map((item, index) => (
+          <div key={index}>{/* Your Tailwind card design here */}</div>
+        ))}
+      </div>
     </div>
   );
 }
