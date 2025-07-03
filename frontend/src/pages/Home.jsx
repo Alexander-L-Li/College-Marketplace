@@ -4,7 +4,18 @@ import { useNavigate } from "react-router-dom";
 function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name"); // name, price, time
+
+  const filteredListings = listings
+    .filter((listing) =>
+      listing.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === "price") return a.price - b.price;
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      return 0;
+    });
 
   useEffect(() => {
     const session = localStorage.getItem("session");
@@ -17,7 +28,7 @@ function Home() {
         const res = await fetch("http://localhost:3001/listings");
         const data = await res.json();
         setListings(data);
-        // console.log(data); delete this later
+        // console.log(data);
       } catch (err) {
         console.error(err);
       }
@@ -52,9 +63,22 @@ function Home() {
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
           />
         </div>
+
+        {/* Sort Bar */}
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-black">Current Listings</h2>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-black"
+          >
+            <option value="name">Sort by Name</option>
+            <option value="price">Sort by Price</option>
+          </select>
+        </div>
       </div>
       <div>
-        {listings.map((item, index) => (
+        {filteredListings.map((item, index) => (
           <div key={index}>{/* Your Tailwind card design here */}</div>
         ))}
       </div>
