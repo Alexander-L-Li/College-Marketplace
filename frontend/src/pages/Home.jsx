@@ -40,6 +40,18 @@ function Home() {
           <h1 className="text-2xl font-bold text-black mb-2">Dorm Drop</h1>
           <p className="text-gray-600 text-sm">MIT Campus Marketplace</p>
         </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <input
+            type="text"
+            placeholder="Search items..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+          />
+        </div>
       </div>
       <div>
         {listings.map((item, index) => (
