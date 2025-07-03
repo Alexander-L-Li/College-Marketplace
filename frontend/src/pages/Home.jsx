@@ -45,7 +45,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-white px-4 py-6">
-      <div className="max-w-md mx-auto space-y-6">
+      <div className="max-w mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-black mb-2">Dorm Drop</h1>
@@ -54,13 +54,12 @@ function Home() {
 
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <input
             type="text"
             placeholder="Search items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+            className="w-full pl-3 pr-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
           />
         </div>
 
@@ -77,9 +76,34 @@ function Home() {
           </select>
         </div>
       </div>
-      <div>
-        {filteredListings.map((item, index) => (
-          <div key={index}>{/* Your Tailwind card design here */}</div>
+      {/* Listings */}
+      <div className="space-y-4">
+        {filteredListings.map((listing) => (
+          <div
+            key={listing.id}
+            onClick={() => handleListingClick(listing.id)}
+            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          >
+            <div className="flex items-center space-x-4">
+              {/* Image Placeholder */}
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                <span className="text-gray-400 text-xs">No Image</span>
+              </div>
+
+              {/* Item Info */}
+              <div className="flex-1">
+                <h3 className="font-bold text-black text-base">
+                  {listing.name}
+                </h3>
+                <p className="text-lg font-semibold text-black">
+                  ${listing.price}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {listing.seller} • {listing.dorm}
+                </p>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
