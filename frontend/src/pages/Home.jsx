@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [sortBy, setSortBy] = useState("name"); // name, price, time
 
   useEffect(() => {
     const session = localStorage.getItem("session");
