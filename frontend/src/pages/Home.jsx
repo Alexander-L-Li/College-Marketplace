@@ -5,15 +5,21 @@ function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("name"); // name, price, time
+  const [sortBy, setSortBy] = useState("name_asc");
 
   const filteredListings = listings
     .filter((listing) =>
       listing.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortBy === "price") return a.price - b.price;
-      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+      if (sortBy === "price_asc") return a.price - b.price;
+      if (sortBy === "price_desc") return b.price - a.price;
+      if (sortBy === "latest")
+        return new Date(b.posted_at) - new Date(a.posted_at);
+      if (sortBy === "oldest")
+        return new Date(a.posted_at) - new Date(b.posted_at);
       return 0;
     });
 
@@ -67,12 +73,16 @@ function Home() {
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold text-black">Current Listings</h2>
           <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-black"
           >
-            <option value="name">Sort by Name</option>
-            <option value="price">Sort by Price</option>
+            <option value="name_asc">Name (A to Z)</option>
+            <option value="name_desc">Name (Z to A)</option>
+            <option value="price_asc">Price (Low to High)</option>
+            <option value="price_desc">Price (High to Low)</option>
+            <option value="latest">Latest</option>
+            <option value="oldest">Oldest</option>
           </select>
         </div>
       </div>
