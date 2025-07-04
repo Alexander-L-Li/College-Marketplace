@@ -70,17 +70,17 @@ function Home() {
         </div>
 
         {/* Sort Bar */}
-        <div className="flex justify-between items-center">
+        <div className="py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-black">Current Listings</h2>
           <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-black"
           >
             <option value="name_asc">Name (A to Z)</option>
             <option value="name_desc">Name (Z to A)</option>
-            <option value="price_asc">Price (Low to High)</option>
-            <option value="price_desc">Price (High to Low)</option>
+            <option value="price_asc">Price (low to high)</option>
+            <option value="price_desc">Price (high to low)</option>
             <option value="latest">Latest</option>
             <option value="oldest">Oldest</option>
           </select>
