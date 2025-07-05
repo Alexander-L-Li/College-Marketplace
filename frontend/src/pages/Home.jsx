@@ -97,7 +97,9 @@ function Home() {
             <div className="flex items-center space-x-4">
               {/* Image Placeholder */}
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-xs">No Image</span>
+                <span className="text-gray-400 text-xs">
+                  listing.cover_image_url
+                </span>
               </div>
 
               {/* Item Info */}
