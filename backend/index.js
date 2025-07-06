@@ -105,4 +105,6 @@ app.get("/listings", async (req, res) => {
     console.error(err);
     res.status(500).send("Database error");
   }
+
+  // Post new listings
 });
