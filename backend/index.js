@@ -107,4 +107,18 @@ app.get("/listings", async (req, res) => {
   }
 
   // Post new listings
+  app.post("/listings"),
+    async (req, res) => {
+      const { name, category, price, description, college, image_urls } =
+        req.body;
+      if (image_urls.length > 6) {
+        res.status(400).send("Cannot upload more than 6 images.");
+      }
+      const newListing = await pool.query(
+        `INSERT INTO listings (name, category, price, description, college)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [(name, category, price, description, college)]
+      );
+    };
 });
