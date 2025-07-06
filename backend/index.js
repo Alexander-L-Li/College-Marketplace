@@ -114,11 +114,22 @@ app.get("/listings", async (req, res) => {
       if (image_urls.length > 6) {
         res.status(400).send("Cannot upload more than 6 images.");
       }
-      const newListing = await pool.query(
-        `INSERT INTO listings (name, category, price, description, college)
+      try {
+        const newListingId = await pool.query(
+          `INSERT INTO listings (name, category, price, description, college)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [(name, category, price, description, college)]
-      );
+          [(name, category, price, description, college)]
+        );
+        for (let url of image_urls) {
+          await pool.query(
+            `INSERT INTO listing_images (listing_id, image_url)
+           VALUES ($1, $2)`[(newListingId, url)]
+          );
+        }
+      } catch (err) {
+        console.error(err);
+        res.status(500).send("Network error.");
+      }
     };
 });
