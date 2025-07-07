@@ -109,18 +109,36 @@ app.get("/listings", async (req, res) => {
   // Post new listings
   app.post("/listings"),
     async (req, res) => {
-      const { name, category, price, description, college, image_urls } =
+      const { name, categories, price, description, college, image_urls } =
         req.body;
       if (image_urls.length > 6) {
         res.status(400).send("Cannot upload more than 6 images.");
       }
       try {
         const newListingId = await pool.query(
-          `INSERT INTO listings (name, category, price, description, college)
+          `INSERT INTO listings (name, categories, price, description, college)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
           [(name, category, price, description, college)]
         );
+        for (let category_name of categories) {
+          const result = await pool.query(
+            `SELECT id FROM categories WHERE name = $1`,
+            [category_name]
+          );
+          let category_id = result.rows[0].id;
+          if (result.rows.length === 0) {
+            category_id = await pool.query(
+              `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
+              [category_name]
+            );
+          } else {
+            await pool.query(
+              `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
+              [(newListingId, category_id)]
+            );
+          }
+        }
         for (let url of image_urls) {
           await pool.query(
             `INSERT INTO listing_images (listing_id, image_url)
