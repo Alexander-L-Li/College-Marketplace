@@ -101,7 +101,15 @@ app.get("/listings", async (req, res) => {
 
     const result = await pool.query(finalQuery, values);
     for (let listing of result.rows) {
-      // TBD
+      const categoryQuery = await pool.query(
+        `SELECT c.name
+         FROM categories c
+         JOIN listing_categories lc ON c.id = lc.category_id
+         WHERE lc.listing_id = $1`,
+        [listing.id]
+      );
+
+      listing.categories = categoryQuery.rows.map((row) => row.name);
     }
     res.json(result.rows);
   } catch (err) {
@@ -114,9 +122,13 @@ app.get("/listings", async (req, res) => {
 app.post("/listings", async (req, res) => {
   const { name, categories, price, description, college, image_urls } =
     req.body;
-  if (image_urls.length > 6) {
-    res.status(400).send("Cannot upload more than 6 images.");
+
+  if (!image_urls || !Array.isArray(image_urls)) {
+    return res.status(400).send("Please upload at least one photo.");
+  } else if (image_urls.length > 6) {
+    return res.status(400).send("Cannot upload more than 6 images.");
   }
+
   try {
     const newListingQuery = await pool.query(
       `INSERT INTO listings (name, price, description, college)
@@ -131,19 +143,22 @@ app.post("/listings", async (req, res) => {
         `SELECT id FROM categories WHERE name = $1`,
         [category_name]
       );
-      let category_id = categoryQuery.rows[0].id;
+
+      let category_id = categoryQuery.rows[0].id; // default: existing id
+
       if (categoryQuery.rows.length === 0) {
         categoryIdQuery = await pool.query(
           `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
           [category_name]
         );
-        category_id = categoryIdQuery.rows[0].id;
-      } else {
-        await pool.query(
-          `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
-          [newListingId, category_id]
-        );
+        category_id = categoryIdQuery.rows[0].id; // id of newly added category
       }
+
+      // always insert into the join table
+      await pool.query(
+        `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
+        [newListingId, category_id]
+      );
     }
     for (let url of image_urls) {
       await pool.query(
@@ -152,6 +167,8 @@ app.post("/listings", async (req, res) => {
         [newListingId, url]
       );
     }
+
+    res.status(201).send("Listing created successfully.");
   } catch (err) {
     console.error(err);
     res.status(500).send("Network error.");
