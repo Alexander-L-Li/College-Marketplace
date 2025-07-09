@@ -96,7 +96,14 @@ app.get("/listings", async (req, res) => {
       whereClause = `WHERE l.name ILIKE $1 OR l.description ILIKE $1 OR c.name ILIKE $1`;
     }
 
-    const listingsQuery = `SELECT l.id, l.name, l.price, l.description, l.college, l.cover_image_url, l.posted_at, 
+    const listingsQuery = `
+    SELECT l.id, l.name, l.price, l.description, l.college, l.posted_at, 
+    (
+    SELECT image_url 
+    FROM listing_images 
+    WHERE listing_id = l.id AND is_cover = true 
+    LIMIT 1
+    ) AS cover_image_url,
     ARRAY_AGG(DISTINCT c.name) AS categories,
     ARRAY_AGG(DISTINCT i.image_url) AS images
     FROM listings l
@@ -111,21 +118,14 @@ app.get("/listings", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send("Database error");
+    res.status(500).send("Database error.");
   }
 });
 
 // Post new listings
 app.post("/listings", async (req, res) => {
-  const {
-    name,
-    categories,
-    price,
-    description,
-    college,
-    image_urls,
-    cover_image_url,
-  } = req.body;
+  const { name, categories, price, description, college, image_urls } =
+    req.body;
 
   if (!image_urls || !Array.isArray(image_urls)) {
     return res.status(400).send("Please upload at least one photo.");
@@ -135,10 +135,10 @@ app.post("/listings", async (req, res) => {
 
   try {
     const newListingQuery = await pool.query(
-      `INSERT INTO listings (name, price, description, college, cover_image_url)
+      `INSERT INTO listings (name, price, description, college)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [name, price, description, college, cover_image_url]
+      [name, price, description, college]
     );
     const newListingId = newListingQuery.rows[0].id;
 
@@ -166,11 +166,12 @@ app.post("/listings", async (req, res) => {
         [newListingId, category_id]
       );
     }
-    for (let url of image_urls) {
+
+    for (let image of image_urls) {
       await pool.query(
-        `INSERT INTO listing_images (listing_id, image_url)
-           VALUES ($1, $2)`,
-        [newListingId, url]
+        `INSERT INTO listing_images (listing_id, image_url, is_cover)
+         VALUES ($1, $2, $3)`,
+        [newListingId, image.url, image.is_cover]
       );
     }
 
