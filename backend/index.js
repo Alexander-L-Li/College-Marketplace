@@ -76,41 +76,38 @@ app.post("/login", async (req, res) => {
 app.get("/listings", async (req, res) => {
   const { search, sort } = req.query;
 
+  const sortOptions = {
+    name_asc: "l.name ASC",
+    name_desc: "l.name DESC",
+    price_asc: "l.price ASC",
+    price_desc: "l.price DESC",
+    latest: "l.posted_at DESC",
+    oldest: "l.posted_at ASC",
+  };
+
+  const orderBy = sortOptions[sort] || "l.posted_at DESC"; // default fallback
+
   try {
-    let baseQuery = "SELECT * FROM listings";
     let values = [];
-    let conditions = [];
-    let sortQuery = "ORDER BY posted_at DESC";
+    let whereClause = "";
 
     if (search) {
-      conditions.push("(name ILIKE $1 OR description ILIKE $1)");
       values.push(`%${search}%`);
+      whereClause = `WHERE l.name ILIKE $1 OR l.description ILIKE $1 OR c.name ILIKE $1`;
     }
 
-    const allowedSortFields = ["price", "name", "posted_at"];
+    const listingsQuery = `SELECT l.id, l.name, l.price, l.description, l.college, l.cover_image_url, l.posted_at, 
+    ARRAY_AGG(DISTINCT c.name) AS categories,
+    ARRAY_AGG(DISTINCT i.image_url) AS images
+    FROM listings l
+    LEFT JOIN listing_categories lc ON l.id = lc.listing_id
+    LEFT JOIN categories c ON lc.category_id = c.id
+    LEFT JOIN listing_images i ON l.id = i.listing_id
+    ${whereClause}
+    GROUP BY l.id
+    ORDER BY ${orderBy};`;
 
-    if (sort && allowedSortFields.includes(sort)) {
-      sortQuery = `ORDER BY ${sort} ASC`;
-    }
-
-    if (conditions.length) {
-      baseQuery += " WHERE " + conditions.join(" AND ");
-    }
-
-    const finalQuery = baseQuery + " " + sortQuery;
-
-    const result = await pool.query(finalQuery, values);
-    for (let listing of result.rows) {
-      const categoryQuery = await pool.query(
-        `SELECT c.name
-         FROM categories c
-         JOIN listing_categories lc ON c.id = lc.category_id
-         WHERE lc.listing_id = $1`,
-        [listing.id]
-      );
-
-      listing.categories = categoryQuery.rows.map((row) => row.name);
-    }
+    const result = await pool.query(listingsQuery, values);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -127,7 +124,7 @@ app.post("/listings", async (req, res) => {
     description,
     college,
     image_urls,
-    cover_image_urls,
+    cover_image_url,
   } = req.body;
 
   if (!image_urls || !Array.isArray(image_urls)) {
@@ -141,7 +138,7 @@ app.post("/listings", async (req, res) => {
       `INSERT INTO listings (name, price, description, college, cover_image_url)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [name, price, description, college, cover_image_urls]
+      [name, price, description, college, cover_image_url]
     );
     const newListingId = newListingQuery.rows[0].id;
 
@@ -151,14 +148,16 @@ app.post("/listings", async (req, res) => {
         [category_name]
       );
 
-      let category_id = categoryQuery.rows[0].id; // default: existing id
+      let category_id;
 
       if (categoryQuery.rows.length === 0) {
         const categoryIdQuery = await pool.query(
           `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
           [category_name]
         );
-        category_id = categoryIdQuery.rows[0].id; // id of newly added category
+        category_id = categoryIdQuery.rows[0].id;
+      } else {
+        category_id = categoryQuery.rows[0].id;
       }
 
       // always insert into the join table
