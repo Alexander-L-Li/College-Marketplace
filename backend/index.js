@@ -120,8 +120,15 @@ app.get("/listings", async (req, res) => {
 
 // Post new listings
 app.post("/listings", async (req, res) => {
-  const { name, categories, price, description, college, image_urls } =
-    req.body;
+  const {
+    name,
+    categories,
+    price,
+    description,
+    college,
+    image_urls,
+    cover_image_urls,
+  } = req.body;
 
   if (!image_urls || !Array.isArray(image_urls)) {
     return res.status(400).send("Please upload at least one photo.");
@@ -131,10 +138,10 @@ app.post("/listings", async (req, res) => {
 
   try {
     const newListingQuery = await pool.query(
-      `INSERT INTO listings (name, price, description, college)
+      `INSERT INTO listings (name, price, description, college, cover_image_url)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [name, price, description, college]
+      [name, price, description, college, cover_image_urls]
     );
     const newListingId = newListingQuery.rows[0].id;
 
@@ -147,7 +154,7 @@ app.post("/listings", async (req, res) => {
       let category_id = categoryQuery.rows[0].id; // default: existing id
 
       if (categoryQuery.rows.length === 0) {
-        categoryIdQuery = await pool.query(
+        const categoryIdQuery = await pool.query(
           `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
           [category_name]
         );
