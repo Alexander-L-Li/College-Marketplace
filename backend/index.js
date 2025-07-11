@@ -182,3 +182,20 @@ app.post("/listings", async (req, res) => {
     res.status(500).send("Network error.");
   }
 });
+
+// nodemailer sendEmail feature
+const sendEmail = require("./utils/sendEmail");
+
+app.get("/test-email", async (req, res) => {
+  try {
+    await sendEmail(
+      "YOURPERSONALEMAIL@edu",
+      "Test Email",
+      "Hello from DormDrop!"
+    );
+    res.send("Test email sent!");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to send email");
+  }
+});
