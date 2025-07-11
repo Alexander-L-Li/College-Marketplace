@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("./db");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
+const sendEmail = require("./utils/sendEmail");
 
 require("dotenv").config();
 
