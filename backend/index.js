@@ -184,15 +184,10 @@ app.post("/listings", async (req, res) => {
 });
 
 // nodemailer sendEmail feature
-const sendEmail = require("./utils/sendEmail");
 
 app.get("/test-email", async (req, res) => {
   try {
-    await sendEmail(
-      "YOURPERSONALEMAIL@edu",
-      "Test Email",
-      "Hello from DormDrop!"
-    );
+    await sendEmail("alxli@mit.edu", "Test Email", "Hello from DormSpace!");
     res.send("Test email sent!");
   } catch (err) {
     console.error(err);
