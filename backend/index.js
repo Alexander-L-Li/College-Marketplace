@@ -189,22 +189,6 @@ app.post("/listings", async (req, res) => {
   }
 });
 
-// Nodemailer test
-
-app.get("/test-email", async (req, res) => {
-  try {
-    await sendEmail(
-      "alexli01890@gmail.com",
-      "Test Email",
-      "Hello from DormSpace!"
-    );
-    res.send("Test email sent!");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Failed to send email");
-  }
-});
-
 // Reset password
 app.post("/forgot-password", async (req, res) => {
   try {
