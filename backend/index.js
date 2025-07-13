@@ -3,6 +3,7 @@ const pool = require("./db/db");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
+const { v4: uuidv4 } = require("uuid");
 
 require("dotenv").config();
 
@@ -183,14 +184,54 @@ app.post("/listings", async (req, res) => {
   }
 });
 
-// nodemailer sendEmail feature
+// Nodemailer test
 
 app.get("/test-email", async (req, res) => {
   try {
-    await sendEmail("alxli@mit.edu", "Test Email", "Hello from DormSpace!");
+    await sendEmail(
+      "alexli01890@gmail.com",
+      "Test Email",
+      "Hello from DormSpace!"
+    );
     res.send("Test email sent!");
   } catch (err) {
     console.error(err);
     res.status(500).send("Failed to send email");
+  }
+});
+
+// Reset password
+app.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await pool.query(`SELECT id FROM users WHERE email = $1`, [
+      email,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found.");
+    } else {
+      const user_id = result.rows[0].id;
+      const token = uuidv4();
+      const expiration_time = new Date(Date.now() + 3600000);
+      await pool.query(
+        `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user_id, token, expiration_time]
+      );
+
+      const resetLink = `${process.env.FRONTEND_BASE_URL}/reset-password?token=${token}`;
+
+      await sendEmail(
+        email,
+        "Password Reset for DormSpace",
+        `Link to reset your DormSpace account password: ${resetLink}`
+      );
+
+      return res.status(200).send("Password reset email sent.");
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to reset password.");
   }
 });
