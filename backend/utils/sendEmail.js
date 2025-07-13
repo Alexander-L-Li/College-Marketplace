@@ -10,7 +10,7 @@ async function sendEmail(to, subject, text) {
   });
 
   await transporter.sendMail({
-    from: `"DormDrop Support" <${process.env.EMAIL_USER}>`,
+    from: `"DormSpace Support" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     text,

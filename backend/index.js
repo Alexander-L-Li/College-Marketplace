@@ -88,6 +88,10 @@ app.get("/listings", async (req, res) => {
     oldest: "l.posted_at ASC",
   };
 
+  if (sort && !sortOptions.hasOwnProperty(sort)) {
+    return res.status(400).send("Invalid sort option.");
+  }
+
   const orderBy = sortOptions[sort] || "l.posted_at DESC"; // default fallback
 
   try {
