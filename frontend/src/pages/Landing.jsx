@@ -24,11 +24,14 @@ const Landing = () => {
         : { email_entry: email, password_entry: password };
 
     try {
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}${endpoint}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.text();
       if (res.ok) {
