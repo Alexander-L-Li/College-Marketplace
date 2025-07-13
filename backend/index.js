@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
 const { v4: uuidv4 } = require("uuid");
+const { canRequestReset } = require("./utils/rateLimiter");
 
 require("dotenv").config();
 
@@ -207,6 +208,12 @@ app.post("/forgot-password", async (req, res) => {
     const result = await pool.query(`SELECT id FROM users WHERE email = $1`, [
       email,
     ]);
+
+    if (!canRequestReset(email)) {
+      return res
+        .status(429)
+        .send("You can request a password reset only once every 5 minutes.");
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).send("User not found.");
