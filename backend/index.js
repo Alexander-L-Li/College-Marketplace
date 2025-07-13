@@ -3,8 +3,8 @@ const pool = require("./db/db");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
-const { v4: uuidv4 } = require("uuid");
 const { canRequestReset } = require("./utils/rateLimiter");
+const { v4: uuidv4 } = require("uuid");
 
 require("dotenv").config();
 
@@ -52,6 +52,9 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
+    console.log("Login request received");
+    console.log("Email:", email_entry);
+    console.log("Password:", password_entry);
     const result = await pool.query(
       `SELECT password FROM users WHERE email = $1`,
       [email_entry]
@@ -70,7 +73,7 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid password." });
     }
   } catch (err) {
-    console.error(err);
+    console.error("Login route error:", err);
     res.status(500).send("Server error.");
   }
 });
