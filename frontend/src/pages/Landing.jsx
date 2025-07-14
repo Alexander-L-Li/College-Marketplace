@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 const Landing = () => {
   const [mode, setMode] = useState("register");
@@ -42,8 +46,6 @@ const Landing = () => {
         } else {
           setMessage("Registration successful! Please log in.");
           setMode("login");
-
-          // Clear form fields after successful registration
           setFirstName("");
           setLastName("");
           setEmail("");
@@ -63,7 +65,6 @@ const Landing = () => {
   const toggleMode = () => {
     setMode(mode === "register" ? "login" : "register");
     setMessage("");
-    // Optionally clear fields when switching modes
     if (mode === "login") {
       setFirstName("");
       setLastName("");
@@ -73,10 +74,9 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-2 py-8">
       <div className="w-full max-w-sm space-y-8">
-        {/* Header Section */}
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold text-black tracking-tight">
-            Dorm Drop
+            Dorm Space
           </h1>
           <p className="text-gray-600 text-base leading-relaxed px-2">
             MIT's exclusive campus marketplace. Buy, sell, and trade with your
@@ -84,10 +84,8 @@ const Landing = () => {
           </p>
         </div>
 
-        {/* Form Section */}
         <div className="space-y-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Registration Fields */}
             <div
               className={`space-y-4 transition-all duration-300 ${
                 mode === "register"
@@ -95,74 +93,74 @@ const Landing = () => {
                   : "opacity-0 max-h-0 overflow-hidden"
               }`}
             >
-              <input
+              <Input
                 type="text"
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
-              <input
+              <Input
                 type="text"
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
             </div>
 
-            {/* Common Fields */}
             <div className="space-y-4">
-              <input
+              <Input
                 type="email"
                 placeholder="Email (.edu required)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required
               />
-              <input
+              <Input
                 type="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required
               />
             </div>
 
-            {/* Submit Button */}
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full px-4 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full font-semibold"
             >
-              {isLoading
-                ? mode === "register"
-                  ? "Creating Account..."
-                  : "Logging In..."
-                : mode === "register"
-                ? "Create Account"
-                : "Log In"}
-            </button>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {mode === "register"
+                    ? "Creating Account..."
+                    : "Logging In..."}
+                </>
+              ) : mode === "register" ? (
+                "Create Account"
+              ) : (
+                "Log In"
+              )}
+            </Button>
           </form>
 
-          {/* Message Display */}
           {message && (
-            <div
-              className={`text-center text-sm font-medium px-3 py-2 rounded-lg transition-all duration-300 ${
+            <Alert
+              variant={
+                message.includes("successful") ? "default" : "destructive"
+              }
+              className={`animate-in slide-in-from-top-2 duration-300 ${
                 message.includes("successful")
-                  ? "text-green-700 bg-green-50 border border-green-200"
-                  : "text-red-700 bg-red-50 border border-red-200"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : ""
               }`}
             >
-              {message}
-            </div>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Mode Toggle */}
           <div className="text-center">
             <button
               type="button"

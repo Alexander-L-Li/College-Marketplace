@@ -54,8 +54,8 @@ function Home() {
       <div className="max-w mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-black mb-2">DormSpace</h1>
-          <p className="text-gray-600 text-sm">MIT Campus Marketplace</p>
+          <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
+          <p className="text-gray-600 text-sm">MIT's Campus Marketplace</p>
         </div>
 
         {/* Search Bar */}

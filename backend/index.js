@@ -52,9 +52,6 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
-    console.log("Login request received");
-    console.log("Email:", email_entry);
-    console.log("Password:", password_entry);
     const result = await pool.query(
       `SELECT password FROM users WHERE email = $1`,
       [email_entry]
