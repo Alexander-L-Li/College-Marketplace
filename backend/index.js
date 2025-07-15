@@ -67,7 +67,7 @@ app.post("/login", async (req, res) => {
         .status(200)
         .json({ token: "fake-session-token", email: email_entry });
     } else {
-      return res.status(401).json({ message: "Invalid password." });
+      return res.status(401).send("Invalid password. Try again.");
     }
   } catch (err) {
     console.error("Login route error:", err);

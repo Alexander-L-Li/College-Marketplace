@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
 
 const Landing = () => {
   const [mode, setMode] = useState("register");
@@ -11,6 +8,7 @@ const Landing = () => {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -20,6 +18,20 @@ const Landing = () => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
+
+    if (mode === "register") {
+      if (password.length < 8) {
+        setMessage("Password must be at least 8 characters long.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setMessage("Passwords do not match.");
+        setIsLoading(false);
+        return;
+      }
+    }
 
     const endpoint = mode === "register" ? "/register" : "/login";
     const payload =
@@ -46,10 +58,13 @@ const Landing = () => {
         } else {
           setMessage("Registration successful! Please log in.");
           setMode("login");
+
+          // Clear form fields after successful registration
           setFirstName("");
           setLastName("");
           setEmail("");
           setPassword("");
+          setConfirmPassword("");
         }
       } else {
         setMessage(data || "Something went wrong");
@@ -76,7 +91,7 @@ const Landing = () => {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold text-black tracking-tight">
-            Dorm Space
+            Dorm Drop
           </h1>
           <p className="text-gray-600 text-base leading-relaxed px-2">
             MIT's exclusive campus marketplace. Buy, sell, and trade with your
@@ -93,57 +108,66 @@ const Landing = () => {
                   : "opacity-0 max-h-0 overflow-hidden"
               }`}
             >
-              <Input
+              <input
                 type="text"
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
-              <Input
+              <input
                 type="text"
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
             </div>
 
             <div className="space-y-4">
-              <Input
+              <input
                 type="email"
                 placeholder="Email (.edu required)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required
               />
-              <Input
+              <input
                 type="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required
               />
+              {mode === "register" && (
+                <input
+                  type="password"
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
+                  required
+                />
+              )}
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={isLoading}
-              className="w-full font-semibold"
+              className="w-full px-4 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {mode === "register"
-                    ? "Creating Account..."
-                    : "Logging In..."}
-                </>
-              ) : mode === "register" ? (
-                "Create Account"
-              ) : (
-                "Log In"
-              )}
-            </Button>
+              {isLoading
+                ? mode === "register"
+                  ? "Creating Account..."
+                  : "Logging In..."
+                : mode === "register"
+                ? "Create Account"
+                : "Log In"}
+            </button>
           </form>
 
           {message && (
@@ -151,7 +175,7 @@ const Landing = () => {
               variant={
                 message.includes("successful") ? "default" : "destructive"
               }
-              className={`animate-in slide-in-from-top-2 duration-300 ${
+              className={`text-center animate-in slide-in-from-top-2 duration-300 ${
                 message.includes("successful")
                   ? "border-green-200 bg-green-50 text-green-800"
                   : ""
