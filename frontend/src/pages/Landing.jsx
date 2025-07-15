@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 const Landing = () => {
   const [mode, setMode] = useState("register");
@@ -56,10 +59,10 @@ const Landing = () => {
           localStorage.setItem("session", json.token);
           navigate("/home");
         } else {
-          setMessage("Registration successful! Please log in.");
+          setMessage(
+            "Registration successful! Check your email to verify your account."
+          );
           setMode("login");
-
-          // Clear form fields after successful registration
           setFirstName("");
           setLastName("");
           setEmail("");
@@ -80,10 +83,10 @@ const Landing = () => {
   const toggleMode = () => {
     setMode(mode === "register" ? "login" : "register");
     setMessage("");
-    if (mode === "login") {
-      setFirstName("");
-      setLastName("");
-    }
+    setFirstName("");
+    setLastName("");
+    setPassword("");
+    setConfirmPassword("");
   };
 
   return (
@@ -108,66 +111,62 @@ const Landing = () => {
                   : "opacity-0 max-h-0 overflow-hidden"
               }`}
             >
-              <input
+              <Input
                 type="text"
                 placeholder="First Name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
-              <input
+              <Input
                 type="text"
                 placeholder="Last Name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
                 required={mode === "register"}
               />
             </div>
 
-            <div className="space-y-4">
-              <input
-                type="email"
-                placeholder="Email (.edu required)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
-                required
-              />
-              <input
+            <Input
+              type="email"
+              placeholder="Email (.edu required)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+            {mode === "register" && password.length > 0 && (
+              <Input
                 type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                minLength={8}
               />
-              {mode === "register" && (
-                <input
-                  type="password"
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
-                  required
-                />
-              )}
-            </div>
+            )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-4 py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? mode === "register"
-                  ? "Creating Account..."
-                  : "Logging In..."
-                : mode === "register"
-                ? "Create Account"
-                : "Log In"}
-            </button>
+            <Button type="submit" disabled={isLoading} className="w-full">
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {mode === "register"
+                    ? "Creating Account..."
+                    : "Logging In..."}
+                </>
+              ) : mode === "register" ? (
+                "Create Account"
+              ) : (
+                "Log In"
+              )}
+            </Button>
           </form>
 
           {message && (
@@ -175,7 +174,7 @@ const Landing = () => {
               variant={
                 message.includes("successful") ? "default" : "destructive"
               }
-              className={`text-center animate-in slide-in-from-top-2 duration-300 ${
+              className={`animate-in slide-in-from-top-2 duration-300 ${
                 message.includes("successful")
                   ? "border-green-200 bg-green-50 text-green-800"
                   : ""
