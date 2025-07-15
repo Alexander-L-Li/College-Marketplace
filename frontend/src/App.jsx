@@ -7,12 +7,14 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import EmailVerification from "./pages/EmailVerification";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/verify" element={<EmailVerification />} />
         <Route path="/home" element={<Home />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
