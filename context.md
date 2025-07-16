@@ -260,4 +260,57 @@ Implementing Secure Email Verification and Session Management
 
 #### **Step 2: `/verify-email` Endpoint**
 
-- **Goal:** Create an endpoint that checks the code, marks the user as verified, and handles expiration
+- **Goal:** Create an endpoint that checks the code, marks the user as verified, and handles expiration.
+- **Questions to Consider:**
+  - How will you query for the code and check its expiration?
+  - How will you update the user’s `is_verified` status?
+  - What error responses should you return for invalid, expired, or already-used codes?
+- **Checkpoint:**
+  - Test with valid, invalid, and expired codes. What responses do you get?
+
+---
+
+#### **Step 3: `/resend-verification` Endpoint with Rate Limiting**
+
+- **Goal:** Allow users to request a new code, but rate-limit requests to prevent abuse.
+- **Questions to Consider:**
+  - How will you implement rate limiting for this endpoint? (Can you reuse your existing logic?)
+  - How will you handle resending codes for already-verified users?
+  - How will you update or replace old codes in the DB?
+- **Checkpoint:**
+  - Try resending codes multiple times—does the rate limit work? Are codes updated in the DB?
+
+---
+
+#### **Step 4: JWT Session Management**
+
+- **Goal:** Replace the fake session token in `/login` with a real JWT.
+- **Questions to Consider:**
+  - What information should you include in the JWT payload?
+  - How will you sign and verify JWTs securely?
+  - How will you handle token expiration and invalidation?
+- **Checkpoint:**
+  - After login, inspect the JWT. Can you decode it? Does it contain the right info?
+
+---
+
+#### **Step 5: Frontend Integration**
+
+- **Goal:** Update the frontend to navigate to `/EmailVerification` after registration, and split login/signup routes.
+- **Questions to Consider:**
+  - How will you pass the user’s email to the verification page?
+  - How will you structure your routes for clarity and maintainability?
+- **Checkpoint:**
+  - Register a new user and confirm the flow works end-to-end.
+
+---
+
+#### **Reflection:**
+
+- After each step, write down what you learned, what was tricky, and any questions you have.
+- When you’re stuck or want feedback, check in with me! I’ll review your code, answer questions, and help you debug.
+
+---
+
+**Ready to start?**
+Pick the first step, try implementing it, and let me know when you want a review or have questions. I’ll be here to help you learn deeply and build with confidence!

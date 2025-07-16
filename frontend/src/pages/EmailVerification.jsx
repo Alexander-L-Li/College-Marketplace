@@ -36,7 +36,7 @@ const EmailVerification = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/verify-email`,
+        `${import.meta.env.VITE_API_BASE_URL}/verify`,
         {
           method: "POST",
           headers: {
