@@ -188,6 +188,89 @@
 
 ---
 
+## 📊 Database Schema (as of June 2024)
+
+### users
+
+| Column     | Type    | Nullable | Default                           | Description       |
+| ---------- | ------- | -------- | --------------------------------- | ----------------- |
+| id         | integer | not null | nextval('users_id_seq'::regclass) | Primary key       |
+| first_name | text    | not null |                                   | User’s first name |
+| last_name  | text    | not null |                                   | User’s last name  |
+| email      | text    | not null |                                   | User’s email      |
+| college    | text    | not null |                                   | User’s college    |
+
+---
+
+### listings
+
+| Column      | Type          | Nullable | Default                              | Description           |
+| ----------- | ------------- | -------- | ------------------------------------ | --------------------- |
+| id          | integer       | not null | nextval('listings_id_seq'::regclass) | Primary key           |
+| name        | text          | not null |                                      | Listing title         |
+| price       | numeric(10,2) | not null |                                      | Listing price         |
+| description | text          | not null |                                      | Listing description   |
+| posted_at   | timestamp     | not null | CURRENT_TIMESTAMP                    | Time posted           |
+| college     | text          | not null | 'mit'::text                          | College (default MIT) |
+
+Indexes:
+
+- listings_pkey PRIMARY KEY (id)
+
+Referenced by:
+
+- listing_categories (listing_id foreign key)
+- listing_images (listing_id foreign key)
+
+---
+
+### listing_images
+
+| Column      | Type      | Nullable | Default                                    | Description        |
+| ----------- | --------- | -------- | ------------------------------------------ | ------------------ |
+| id          | integer   | not null | nextval('listing_images_id_seq'::regclass) | Primary key        |
+| listing_id  | integer   |          |                                            | FK to listings(id) |
+| image_url   | text      | not null |                                            | Image URL          |
+| uploaded_at | timestamp | not null | CURRENT_TIMESTAMP                          | Upload time        |
+| is_cover    | boolean   | not null | false                                      | Is cover image     |
+
+Indexes:
+
+- listing_images_pkey PRIMARY KEY (id)
+
+Foreign-key constraints:
+
+- listing_id REFERENCES listings(id) ON DELETE CASCADE
+
+---
+
+### password_reset_tokens
+
+| Column     | Type                     | Nullable | Default                                           | Description       |
+| ---------- | ------------------------ | -------- | ------------------------------------------------- | ----------------- |
+| id         | integer                  | not null | nextval('password_reset_tokens_id_seq'::regclass) | Primary key       |
+| user_id    | integer                  | not null |                                                   | FK to users(id)   |
+| token      | text                     | not null |                                                   | Reset token       |
+| expires_at | timestamp with time zone | not null |                                                   | Expiration time   |
+| used       | boolean                  |          | false                                             | If token was used |
+
+Indexes:
+
+- password_reset_tokens_pkey PRIMARY KEY (id)
+
+Foreign-key constraints:
+
+- user_id REFERENCES users(id) ON DELETE CASCADE
+
+---
+
+### email_verification_codes
+
+- **Not found in your DB yet!**  
+  (You’ll need to create this table as discussed in previous steps.)
+
+---
+
 ## 🛠️ Discovered Gaps & TODOs (as of June 8, 2024)
 
 ### Backend
@@ -296,21 +379,4 @@ Implementing Secure Email Verification and Session Management
 
 #### **Step 5: Frontend Integration**
 
-- **Goal:** Update the frontend to navigate to `/EmailVerification` after registration, and split login/signup routes.
-- **Questions to Consider:**
-  - How will you pass the user’s email to the verification page?
-  - How will you structure your routes for clarity and maintainability?
-- **Checkpoint:**
-  - Register a new user and confirm the flow works end-to-end.
-
----
-
-#### **Reflection:**
-
-- After each step, write down what you learned, what was tricky, and any questions you have.
-- When you’re stuck or want feedback, check in with me! I’ll review your code, answer questions, and help you debug.
-
----
-
-**Ready to start?**
-Pick the first step, try implementing it, and let me know when you want a review or have questions. I’ll be here to help you learn deeply and build with confidence!
+- **Goal:** Update the frontend to navigate to `/EmailVerification`
