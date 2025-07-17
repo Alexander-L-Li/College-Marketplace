@@ -8,6 +8,10 @@ const { v4: uuidv4 } = require("uuid");
 
 require("dotenv").config();
 
+function generateSixDigitCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -21,10 +25,6 @@ app.listen(PORT, () => {
 // Register the user
 app.post("/register", async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
-
-  function generateSixDigitCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
 
   const code = generateSixDigitCode();
   const expiresAt = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
@@ -64,14 +64,23 @@ app.post("/register", async (req, res) => {
       [userId, code, expiresAt, now]
     );
 
+    const emailQuery = await pool.query(
+      `SELECT email FROM users WHERE id = $1`,
+      [user_id]
+    );
+    const email = emailQuery.rows[0]?.email;
+
+    if (!email) {
+      return res.status(404).send("Email not found for user.");
+    }
+
     await sendEmail(
       email,
       "Verify your Dorm Space email",
       `Enter this 6-digit code to verify your account: ${code}`
     );
 
-    res.json(newUser.rows[0]);
-    return res.status(200).send("Account registration success!");
+    res.status(200).json({ user_id: userId });
   } catch (err) {
     console.error(err);
     if (err.code == "23505") {
@@ -309,11 +318,11 @@ app.post("/verify", async (req, res) => {
 
 // Resend verification email
 app.post("/resend-verification", async (req, res) => {
-  const { email } = req.body;
+  const { user_id } = req.body;
 
   const result = await pool.query(
-    `SELECT last_sent FROM email_verification_codes WHERE email = $1`,
-    [email]
+    `SELECT last_sent FROM email_verification_codes WHERE user_id = $1`,
+    [user_id]
   );
 
   if (result.rowCount === 0) {
@@ -331,8 +340,8 @@ app.post("/resend-verification", async (req, res) => {
   const newExpires = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
 
   await pool.query(
-    `UPDATE email_verification_codes SET code = $1, expires_at = $2, last_sent = $3 WHERE email = $4`,
-    [newCode, newExpires, now, email]
+    `UPDATE email_verification_codes SET code = $1, expires_at = $2, last_sent = $3 WHERE user_id = $4`,
+    [newCode, newExpires, now, user_id]
   );
 
   await sendEmail(
