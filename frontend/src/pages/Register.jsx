@@ -42,12 +42,21 @@ const Register = () => {
         }),
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: text };
+      }
+
       if (res.ok) {
-        const user_id = data.id;
+        const user_id = data.user_id;
         navigate(`/verify?user_id=${user_id}`);
       } else {
-        setMessage(data || "Registration failed.");
+        setMessage(data.error || data || "Registration failed.");
       }
     } catch (err) {
       console.error(err);

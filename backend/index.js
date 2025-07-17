@@ -67,7 +67,7 @@ app.post("/register", async (req, res) => {
   } catch (err) {
     console.error(err);
     if (err.code == "23505") {
-      res.status(500).send("Account already exists, please log in!");
+      res.status(409).json({ error: "Account already exists, please log in!" });
     } else {
       res.status(500).send("Network error.");
     }
