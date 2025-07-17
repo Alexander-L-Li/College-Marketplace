@@ -80,8 +80,8 @@ app.get("/listings", async (req, res) => {
   const { search, sort } = req.query;
 
   const sortOptions = {
-    name_asc: "l.name ASC",
-    name_desc: "l.name DESC",
+    name_asc: "l.title ASC",
+    name_desc: "l.title DESC",
     price_asc: "l.price ASC",
     price_desc: "l.price DESC",
     latest: "l.posted_at DESC",
@@ -100,11 +100,11 @@ app.get("/listings", async (req, res) => {
 
     if (search) {
       values.push(`%${search}%`);
-      whereClause = `WHERE l.name ILIKE $1 OR l.description ILIKE $1 OR c.name ILIKE $1`;
+      whereClause = `WHERE l.title ILIKE $1 OR l.description ILIKE $1 OR c.name ILIKE $1`;
     }
 
     const listingsQuery = `
-    SELECT l.id, l.name, l.price, l.description, l.college, l.posted_at, 
+    SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at, 
     (
     SELECT image_url 
     FROM listing_images 
@@ -131,7 +131,7 @@ app.get("/listings", async (req, res) => {
 
 // Post new listings
 app.post("/listings", async (req, res) => {
-  const { name, categories, price, description, college, image_urls } =
+  const { title, categories, price, description, college, image_urls } =
     req.body;
 
   if (!image_urls || !Array.isArray(image_urls)) {
@@ -142,10 +142,10 @@ app.post("/listings", async (req, res) => {
 
   try {
     const newListingQuery = await pool.query(
-      `INSERT INTO listings (name, price, description, college)
+      `INSERT INTO listings (title, price, description, college)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [name, price, description, college]
+      [title, price, description, college]
     );
     const newListingId = newListingQuery.rows[0].id;
 
@@ -243,7 +243,7 @@ app.post("/verify", async (req, res) => {
   if (result.rows.length === 0) {
     return res.status(400).send("Invalid code.");
   } else {
-    await pool.query(`UPDATE users SET is_verified = true WHERE user_id = $1`, [
+    await pool.query(`UPDATE users SET is_verified = true WHERE id = $1`, [
       user_id,
     ]);
   }
