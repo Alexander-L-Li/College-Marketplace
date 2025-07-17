@@ -87,6 +87,17 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
+    const verificationQuery = await pool.query(
+      `SELECT password, is_verified FROM users WHERE email = $1`,
+      [email_entry]
+    );
+
+    if (!verificationQuery.rows[0].is_verified) {
+      return res
+        .status(403)
+        .send("Please verify your email before logging in.");
+    }
+
     const result = await pool.query(
       `SELECT password FROM users WHERE email = $1`,
       [email_entry]
@@ -281,18 +292,15 @@ app.post("/verify", async (req, res) => {
 
   const { code: storedCode, expires_at } = result.rows[0];
 
-  if (storedCode !== code) {
-    return res.status(400).send("Incorrect code");
-  }
-
-  if (new Date() > expires_at) {
-    return res.status(400).send("Code expired");
+  if (storedCode !== code || new Date() > expires_at) {
+    console.warn(`Invalid or expired code attempt for user_id ${user_id}`);
+    return res.status(400).send("Invalid or expired code");
   }
 
   await pool.query(`UPDATE users SET is_verified = true WHERE id = $1`, [
     user_id,
   ]);
-  await pool.query(`DELETE FROM email_verification_codes WHERE id = $1`, [
+  await pool.query(`DELETE FROM email_verification_codes WHERE user_id = $1`, [
     user_id,
   ]);
 
