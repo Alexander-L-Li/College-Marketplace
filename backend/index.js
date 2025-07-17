@@ -22,6 +22,14 @@ app.listen(PORT, () => {
 app.post("/register", async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
 
+  function generateSixDigitCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  const code = generateSixDigitCode();
+  const expiresAt = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
+  const now = new Date();
+
   if (!email.endsWith(".edu")) {
     return res.status(400).send("Email must be .edu");
   }
@@ -36,7 +44,34 @@ app.post("/register", async (req, res) => {
        RETURNING *`,
       [first_name, last_name, email, college, hashed_password]
     );
+
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE email = $1`,
+      [email]
+    );
+
+    if (userResult.rowCount === 0) {
+      return res.status(500).send("Could not find user ID");
+    }
+
+    const userId = userResult.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO email_verification_codes (user_id, code, expires_at, last_sent)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id)
+       DO UPDATE SET code = EXCLUDED.code, expires_at = EXCLUDED.expires_at, last_sent = EXCLUDED.last_sent`,
+      [userId, code, expiresAt, now]
+    );
+
+    await sendEmail(
+      email,
+      "Verify your Dorm Space email",
+      `Enter this 6-digit code to verify your account: ${code}`
+    );
+
     res.json(newUser.rows[0]);
+    return res.status(200).send("Account registration success!");
   } catch (err) {
     console.error(err);
     if (err.code == "23505") {
