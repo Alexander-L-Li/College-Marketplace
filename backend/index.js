@@ -271,15 +271,32 @@ app.post("/verify", async (req, res) => {
   const { user_id, code } = req.body;
 
   const result = await pool.query(
-    `SELECT * FROM email_verification_codes WHERE user_id = $1 AND code = $2 AND expires_at > NOW()`,
-    [user_id, code]
+    `SELECT code, expires_at FROM email_verification_codes WHERE user_id = $1`,
+    [user_id]
   );
 
-  if (result.rows.length === 0) {
-    return res.status(400).send("Invalid code.");
-  } else {
-    await pool.query(`UPDATE users SET is_verified = true WHERE id = $1`, [
-      user_id,
-    ]);
+  if (result.rowCount === 0) {
+    return res.status(404).send("No code found");
   }
+
+  const { code: storedCode, expires_at } = result.rows[0];
+
+  if (storedCode !== code) {
+    return res.status(400).send("Incorrect code");
+  }
+
+  if (new Date() > expires_at) {
+    return res.status(400).send("Code expired");
+  }
+
+  await pool.query(`UPDATE users SET is_verified = true WHERE id = $1`, [
+    user_id,
+  ]);
+  await pool.query(`DELETE FROM email_verification_codes WHERE id = $1`, [
+    user_id,
+  ]);
+
+  return res.sendStatus(200);
 });
+
+// Resend verification email
