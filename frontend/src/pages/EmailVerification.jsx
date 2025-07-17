@@ -12,13 +12,13 @@ import { Loader2, Mail, CheckCircle } from "lucide-react";
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email") || "";
+  const user_id = searchParams.get("user_id") || "";
 
   const [code, setCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] =
-    (useState < "success") | "error" | ("" > "");
+  const [messageType, setMessageType] = useState(""); // 'success' | 'error' | ''
   const [isVerified, setIsVerified] = useState(false);
 
   // Auto-submit when code is complete
@@ -29,7 +29,7 @@ const EmailVerification = () => {
   }, [code]);
 
   const handleVerifyCode = async () => {
-    if (code.length !== 6) return;
+    if (code.length !== 6 || !user_id) return;
 
     setIsSubmitting(true);
     setMessage("");
@@ -42,7 +42,7 @@ const EmailVerification = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email, code }),
+          body: JSON.stringify({ user_id, code }),
         }
       );
 
@@ -55,7 +55,7 @@ const EmailVerification = () => {
         setMessageType("error");
         setCode("");
       } else if (response.status === 404) {
-        setMessage("User not found. Please register again.");
+        setMessage("Verification code not found. Please register again.");
         setMessageType("error");
       } else if (response.status === 429) {
         setMessage("Too many attempts. Please wait before trying again.");
@@ -75,6 +75,8 @@ const EmailVerification = () => {
   };
 
   const handleResendCode = async () => {
+    if (!user_id || !email) return;
+
     setIsResending(true);
     setMessage("");
 
@@ -86,7 +88,7 @@ const EmailVerification = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ user_id, email }),
         }
       );
 

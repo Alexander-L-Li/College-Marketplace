@@ -308,3 +308,38 @@ app.post("/verify", async (req, res) => {
 });
 
 // Resend verification email
+app.post("/resend-verification", async (req, res) => {
+  const { email } = req.body;
+
+  const result = await pool.query(
+    `SELECT last_sent FROM email_verification_codes WHERE email = $1`,
+    [email]
+  );
+
+  if (result.rowCount === 0) {
+    return res.status(404).send("User not found");
+  }
+
+  const { last_sent } = result.rows[0];
+  const now = new Date();
+  const secondsSinceLastSend = (now - last_sent) / 1000;
+
+  if (secondsSinceLastSend < 30)
+    return res.status(429).send("Wait before resending");
+
+  const newCode = generateSixDigitCode();
+  const newExpires = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
+
+  await pool.query(
+    `UPDATE email_verification_codes SET code = $1, expires_at = $2, last_sent = $3 WHERE email = $4`,
+    [newCode, newExpires, now, email]
+  );
+
+  await sendEmail(
+    email,
+    "Your new Dorm Drop verification code",
+    `Enter this 6-digit code to verify your account: ${newCode}`
+  );
+
+  return res.sendStatus(200);
+});
