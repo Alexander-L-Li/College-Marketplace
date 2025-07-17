@@ -9,11 +9,11 @@ function Home() {
 
   const filteredListings = listings
     .filter((listing) =>
-      listing.name.toLowerCase().includes(searchQuery.toLowerCase())
+      listing.title.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
-      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+      if (sortBy === "name_asc") return a.title.localeCompare(b.title);
+      if (sortBy === "name_desc") return b.title.localeCompare(a.title);
       if (sortBy === "price_asc") return a.price - b.price;
       if (sortBy === "price_desc") return b.price - a.price;
       if (sortBy === "latest")
@@ -55,7 +55,9 @@ function Home() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
-          <p className="text-gray-600 text-sm">MIT's Campus Marketplace</p>
+          <p className="text-gray-600 text-sm">
+            MIT's exclusive campus marketplace.
+          </p>
         </div>
 
         {/* Search Bar */}
@@ -86,7 +88,7 @@ function Home() {
           </select>
         </div>
       </div>
-      {/* Listings NEED TO CHANGE LATER BC OF NEW LISTING DB COLUMNS */}
+      {/* Listings */}
       <div className="space-y-4">
         {filteredListings.map((listing) => (
           <div
@@ -95,23 +97,26 @@ function Home() {
             className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-center space-x-4">
-              {/* Image Placeholder */}
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <span className="text-gray-400 text-xs">
-                  listing.cover_image_url
-                </span>
+              {/* Cover Image */}
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                {listing.cover_image_url ? (
+                  <img
+                    src={listing.cover_image_url}
+                    alt={listing.title}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <span className="text-gray-400 text-xs">No Image</span>
+                )}
               </div>
 
               {/* Item Info */}
               <div className="flex-1">
                 <h3 className="font-bold text-black text-base">
-                  {listing.name}
+                  {listing.title}
                 </h3>
                 <p className="text-lg font-semibold text-black">
                   ${listing.price}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {listing.seller} • {listing.dorm}
                 </p>
               </div>
             </div>

@@ -79,6 +79,15 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
+    const result = await pool.query(
+      `SELECT password FROM users WHERE email = $1`,
+      [email_entry]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found.");
+    }
+
     const verificationQuery = await pool.query(
       `SELECT password, is_verified FROM users WHERE email = $1`,
       [email_entry]
@@ -88,15 +97,6 @@ app.post("/login", async (req, res) => {
       return res
         .status(403)
         .send("Please verify your email before logging in.");
-    }
-
-    const result = await pool.query(
-      `SELECT password FROM users WHERE email = $1`,
-      [email_entry]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).send("User not found.");
     }
 
     const match = await bcrypt.compare(password_entry, result.rows[0].password);
