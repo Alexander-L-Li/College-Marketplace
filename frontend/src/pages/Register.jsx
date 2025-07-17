@@ -65,7 +65,7 @@ const Register = () => {
             Dorm Space
           </h1>
           <p className="text-gray-600 text-base">
-            Create your Dorm Space account.
+            MIT's exclusive campus marketplace.
           </p>
         </div>
 
@@ -129,7 +129,7 @@ const Register = () => {
 
         <div className="text-center">
           <a
-            href="/login"
+            href="/"
             className="text-sm text-gray-600 hover:text-black underline underline-offset-2"
           >
             Already have an account? Log in

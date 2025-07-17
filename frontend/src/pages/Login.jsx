@@ -45,7 +45,9 @@ const Login = () => {
           <h1 className="text-4xl font-bold text-black tracking-tight">
             Dorm Space
           </h1>
-          <p className="text-gray-600 text-base">Log in to your account.</p>
+          <p className="text-gray-600 text-base">
+            MIT's exclusive campus marketplace.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

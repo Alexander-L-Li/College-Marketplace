@@ -12,6 +12,8 @@ function generateSixDigitCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+const CODE_EXPIRY_MS = 30 * 1000;
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -27,7 +29,7 @@ app.post("/register", async (req, res) => {
   const { first_name, last_name, email, password } = req.body;
 
   const code = generateSixDigitCode();
-  const expiresAt = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
+  const expiresAt = new Date(Date.now() + CODE_EXPIRY_MS);
   const now = new Date();
 
   if (!email.endsWith(".edu")) {
@@ -45,16 +47,7 @@ app.post("/register", async (req, res) => {
       [first_name, last_name, email, college, hashed_password]
     );
 
-    const userResult = await pool.query(
-      `SELECT id FROM users WHERE email = $1`,
-      [email]
-    );
-
-    if (userResult.rowCount === 0) {
-      return res.status(500).send("Could not find user ID");
-    }
-
-    const userId = userResult.rows[0].id;
+    const userId = newUser.rows[0].id;
 
     await pool.query(
       `INSERT INTO email_verification_codes (user_id, code, expires_at, last_sent)
@@ -63,16 +56,6 @@ app.post("/register", async (req, res) => {
        DO UPDATE SET code = EXCLUDED.code, expires_at = EXCLUDED.expires_at, last_sent = EXCLUDED.last_sent`,
       [userId, code, expiresAt, now]
     );
-
-    const emailQuery = await pool.query(
-      `SELECT email FROM users WHERE id = $1`,
-      [user_id]
-    );
-    const email = emailQuery.rows[0]?.email;
-
-    if (!email) {
-      return res.status(404).send("Email not found for user.");
-    }
 
     await sendEmail(
       email,
@@ -337,16 +320,25 @@ app.post("/resend-verification", async (req, res) => {
     return res.status(429).send("Wait before resending");
 
   const newCode = generateSixDigitCode();
-  const newExpires = new Date(Date.now() + 0.5 * 60 * 1000); // 30 seconds
+  const newExpires = new Date(Date.now() + CODE_EXPIRY_MS);
 
   await pool.query(
     `UPDATE email_verification_codes SET code = $1, expires_at = $2, last_sent = $3 WHERE user_id = $4`,
     [newCode, newExpires, now, user_id]
   );
 
+  const emailQuery = await pool.query(`SELECT email FROM users WHERE id = $1`, [
+    user_id,
+  ]);
+  const email = emailQuery.rows[0]?.email;
+
+  if (!email) {
+    return res.status(404).send("Email not found for user.");
+  }
+
   await sendEmail(
     email,
-    "Your new Dorm Drop verification code",
+    "Your new Dorm Space verification code",
     `Enter this 6-digit code to verify your account: ${newCode}`
   );
 
