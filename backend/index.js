@@ -273,6 +273,19 @@ app.post("/forgot-password", async (req, res) => {
 app.post("/verify", async (req, res) => {
   const { user_id, code } = req.body;
 
+  const isverifiedQuery = await pool.query(
+    `SELECT is_verified FROM users WHERE id = $1`,
+    [user_id]
+  );
+
+  if (isverifiedQuery.rowCount === 0) {
+    return res.status(404).send("User not found.");
+  }
+
+  if (isverifiedQuery.rows[0].is_verified === true) {
+    return res.status(400).send("This user has already been verified.");
+  }
+
   const result = await pool.query(
     `SELECT code, expires_at FROM email_verification_codes WHERE user_id = $1`,
     [user_id]
