@@ -88,7 +88,7 @@ const EmailVerification = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ user_id, email }),
+          body: JSON.stringify({ user_id }),
         }
       );
 

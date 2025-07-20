@@ -53,7 +53,7 @@ const Register = () => {
       }
 
       if (res.ok) {
-        const user_id = data.user_id;
+        const user_id = data.id || data.user_id;
         navigate(`/verify?user_id=${user_id}`);
       } else {
         setMessage(data.error || data || "Registration failed.");
