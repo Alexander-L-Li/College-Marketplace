@@ -7,7 +7,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Loader2, Mail, CheckCircle } from "lucide-react";
+import { Loader2, Mail, CheckCircle, Clock } from "lucide-react";
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
@@ -21,12 +21,33 @@ const EmailVerification = () => {
   const [messageType, setMessageType] = useState(""); // 'success' | 'error' | ''
   const [isVerified, setIsVerified] = useState(false);
 
+  // Timer state
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [isInCooldown, setIsInCooldown] = useState(false);
+
   // Auto-submit when code is complete
   useEffect(() => {
     if (code.length === 6) {
       handleVerifyCode();
     }
   }, [code]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    let interval;
+    if (isInCooldown && cooldownSeconds > 0) {
+      interval = setInterval(() => {
+        setCooldownSeconds((prev) => {
+          if (prev <= 1) {
+            setIsInCooldown(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isInCooldown, cooldownSeconds]);
 
   const handleVerifyCode = async () => {
     if (code.length !== 6 || !user_id) return;
@@ -75,7 +96,7 @@ const EmailVerification = () => {
   };
 
   const handleResendCode = async () => {
-    if (!user_id || !email) return;
+    if (!user_id || isInCooldown) return;
 
     setIsResending(true);
     setMessage("");
@@ -93,11 +114,27 @@ const EmailVerification = () => {
       );
 
       if (response.status === 200) {
-        setMessage("New verification code sent to your email.");
+        setMessage(
+          "✅ Code has been reset! Check your email for the new verification code."
+        );
         setMessageType("success");
+        // Start 30-second cooldown
+        setCooldownSeconds(30);
+        setIsInCooldown(true);
       } else if (response.status === 429) {
-        setMessage("Please wait before requesting another code.");
-        setMessageType("error");
+        const responseText = await response.text();
+        if (responseText.includes("Wait before resending")) {
+          setMessage(
+            "⏰ Please wait 30 seconds before requesting another code."
+          );
+          setMessageType("error");
+          // Start cooldown timer
+          setCooldownSeconds(30);
+          setIsInCooldown(true);
+        } else {
+          setMessage("Please wait before requesting another code.");
+          setMessageType("error");
+        }
       } else {
         setMessage("Failed to resend code. Please try again.");
         setMessageType("error");
@@ -196,7 +233,7 @@ const EmailVerification = () => {
               <Button
                 variant="ghost"
                 onClick={handleResendCode}
-                disabled={isResending}
+                disabled={isResending || isInCooldown}
                 className="text-sm"
               >
                 {isResending ? (
@@ -204,10 +241,31 @@ const EmailVerification = () => {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Sending...
                   </>
+                ) : isInCooldown ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Wait {cooldownSeconds}s
+                  </>
                 ) : (
                   "Resend Code"
                 )}
               </Button>
+
+              {/* Cooldown Timer Display */}
+              {isInCooldown && (
+                <div className="text-xs text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Clock className="w-3 h-3" />
+                    <span>Resend available in {cooldownSeconds} seconds</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
+                    <div
+                      className="bg-blue-600 h-1 rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${(cooldownSeconds / 30) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
