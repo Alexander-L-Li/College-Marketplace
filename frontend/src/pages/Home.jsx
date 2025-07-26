@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import * as jwt_decode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 function Home() {
   const navigate = useNavigate();
@@ -26,38 +26,61 @@ function Home() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    console.log(
+      "Home.jsx - Token retrieved from localStorage:",
+      token ? "Token exists" : "No token"
+    );
+
     if (!token) {
+      console.log("No token found, redirecting to login");
       navigate("/");
-    } else {
-      try {
-        const { exp } = jwt_decode.default(token);
-        if (Date.now() >= exp * 1000) {
-          localStorage.removeItem("token");
-          navigate("/");
-        }
-      } catch (e) {
+      return;
+    }
+
+    try {
+      const { exp } = jwtDecode(token);
+      console.log("Token expiration check:", {
+        exp,
+        currentTime: Date.now(),
+        isExpired: Date.now() >= exp * 1000,
+      });
+      if (Date.now() >= exp * 1000) {
+        console.log("Token expired, redirecting to login");
         localStorage.removeItem("token");
         navigate("/");
+        return;
       }
+    } catch (e) {
+      console.log("Token decode error:", e);
+      localStorage.removeItem("token");
+      navigate("/");
+      return;
     }
 
     async function fetchListings() {
       try {
+        console.log(
+          "Making request to /listings with token:",
+          token ? "Token exists" : "No token"
+        );
         const res = await fetch("http://localhost:3001/listings", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
+        console.log("Response status:", res.status);
         if (!res.ok) {
           const errorText = await res.text();
+          console.log("Error response:", errorText);
           throw new Error(errorText || "Failed to fetch listings");
         }
 
         const data = await res.json();
+        console.log("Listings fetched successfully:", data.length, "items");
         setListings(data);
       } catch (err) {
-        console.error(err);
+        console.error("fetchListings error:", err);
       }
     }
 

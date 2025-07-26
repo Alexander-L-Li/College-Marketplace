@@ -48,6 +48,8 @@
 - ✅ Email verification system (6-digit code)
 - ✅ `/verify-email` and `/resend-verification` routes
 - ✅ Email verification UI w/ cooldown and redirect
+- ✅ JWT Session Management (token signing, verification, middleware)
+- ✅ Frontend JWT integration (storage, expiration checks, protected routes)
 
 ---
 
@@ -345,14 +347,15 @@ Foreign-key constraints:
 
 ### Backend
 
-- [ ] Implement `/verify-email` and `/resend-verification` endpoints.
-- [ ] On registration, generate and email a 6-digit verification code, and create an entry in `email_verification_codes`.
-- [ ] Add rate limiting to `/resend-verification` and `/verify-email` endpoints.
-- [ ] Replace fake session token in `/login` with JWT or real session management.
+- ✅ Implement `/verify-email` and `/resend-verification` endpoints.
+- ✅ On registration, generate and email a 6-digit verification code, and create an entry in `email_verification_codes`.
+- ✅ Add rate limiting to `/resend-verification` and `/verify-email` endpoints.
+- ✅ Replace fake session token in `/login` with JWT or real session management.
+- [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
 
 ### Frontend
 
-- [ ] After successful registration, navigate user to `/EmailVerification` with their email as a query param.
+- ✅ After successful registration, navigate user to `/EmailVerification` with their user_id as a query param.
 - [ ] Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
 
 ### General
@@ -365,15 +368,79 @@ Foreign-key constraints:
 
 ### Backend
 
-- [ ] Finalize `/verify-email` logic (code checking, expiry)
-- [ ] Add rate limit + cooldown to `/resend-verification`
+- ✅ Finalize `/verify-email` logic (code checking, expiry)
+- ✅ Add rate limit + cooldown to `/resend-verification`
+- [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
+- [ ] Handle token expiration and logout (backend side)
 
 ### Frontend
 
-- [ ] Navigate to EmailVerification after successful signup
+- ✅ Navigate to EmailVerification after successful signup
 - [ ] Animate Confirm Password on password input change
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
+
+---
+
+## 🔐 JWT Session Management Implementation (June 2024)
+
+### Backend Implementation
+
+**JWT Middleware (`jwtMiddleware` function in `backend/index.js`):**
+
+- Extracts token from `Authorization: Bearer <token>` header
+- Verifies token using `jwt.verify()` with `JWT_SECRET`
+- Attaches decoded payload to `req.user` for route access
+- Returns 401 for missing, invalid, or expired tokens
+
+**Login Route (`/login` POST):**
+
+- Signs JWT with user `id` and `email` payload
+- Sets 1-hour expiration (`expiresIn: "1h"`)
+- Returns `{ token: token, email: email_entry }` on success
+- Checks `is_verified` status before allowing login
+
+**Protected Routes:**
+
+- Currently only `/listings` GET route is protected with `jwtMiddleware`
+- Other routes need middleware applied as needed
+
+### Frontend Implementation
+
+**Token Storage (`Login.jsx`):**
+
+- Stores JWT in `localStorage` with key `"token"`
+- Uses `res.text()` then `JSON.parse()` for robust response handling
+- Navigates to `/home` after successful login
+
+**Token Validation (`Home.jsx`):**
+
+- Retrieves token from `localStorage` on component mount
+- Uses `jwtDecode` to check token expiration
+- Redirects to login if token is missing, expired, or invalid
+- Sends token in `Authorization: Bearer <token>` header for API calls
+
+**Import Issues Resolved:**
+
+- `jwt-decode@4.0.0` uses named export: `import { jwtDecode } from "jwt-decode"`
+- Not default export: `import jwtDecode from "jwt-decode"`
+
+### Key Lessons Learned
+
+1. **Import Syntax Matters:** Different versions of `jwt-decode` use different export patterns
+2. **Token Scope:** Variables in `useEffect` need proper scoping for nested functions
+3. **Error Handling:** Always check `res.ok` before calling `res.json()` to avoid parsing errors
+4. **Environment Variables:** Ensure `JWT_SECRET` is set in backend `.env` file
+5. **Token Expiration:** Frontend should check expiration before making API calls
+6. **Debugging:** Console logs help track token flow through the authentication pipeline
+
+### Security Considerations
+
+- JWT tokens expire after 1 hour (configurable)
+- Tokens contain minimal payload (`id`, `email`) for security
+- Backend validates tokens on every protected request
+- Frontend removes invalid tokens and redirects to login
+- No sensitive data stored in JWT payload
 
 ---
 

@@ -27,7 +27,15 @@ const Login = () => {
       const data = await res.text();
       if (res.ok) {
         const json = JSON.parse(data);
+        console.log(
+          "Login successful, token received:",
+          json.token ? "Token exists" : "No token"
+        );
         localStorage.setItem("token", json.token);
+        console.log(
+          "Token stored in localStorage:",
+          localStorage.getItem("token") ? "Token stored" : "No token stored"
+        );
         navigate("/home");
       } else {
         setMessage(data || "Login failed.");
