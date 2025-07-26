@@ -385,3 +385,8 @@ app.post("/resend-verification", async (req, res) => {
 
   return res.sendStatus(200);
 });
+
+// Get current user's profile data
+app.get("/profile", jwtMiddleware, async (req, res) => {
+  // Your implementation here
+});
