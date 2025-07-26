@@ -388,5 +388,23 @@ app.post("/resend-verification", async (req, res) => {
 
 // Get current user's profile data
 app.get("/profile", jwtMiddleware, async (req, res) => {
-  // Your implementation here
+  const user_id = req.user.id;
+  try {
+    const result = await pool.query(
+      `SELECT id, first_name, last_name, email, college, created_at, is_verified FROM users WHERE id = $1`,
+      [user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found.");
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error.");
+  }
 });
+
+// Update current user's profile info
+app.patch("/profile", jwtMiddleware, async (req, res) => {});
