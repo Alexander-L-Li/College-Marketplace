@@ -407,4 +407,53 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
 });
 
 // Update current user's profile info
-app.patch("/profile", jwtMiddleware, async (req, res) => {});
+app.patch("/profile", jwtMiddleware, async (req, res) => {
+  const { first_name, last_name } = req.body;
+  const user_id = req.user.id;
+
+  if (!first_name && !last_name) {
+    return res.status(400).send("At least one field must be provided.");
+  }
+
+  try {
+    let query = "UPDATE users SET ";
+    let values = [];
+    let paramCount = 1;
+
+    if (first_name) {
+      if (first_name.trim().length === 0) {
+        return res.status(400).send("First name cannot be empty.");
+      }
+      query += `first_name = $${paramCount}`;
+      values.push(first_name.trim());
+      paramCount++;
+    }
+
+    if (last_name) {
+      if (last_name.trim().length === 0) {
+        return res.status(400).send("Last name cannot be empty.");
+      }
+      if (first_name) query += ", ";
+      query += `last_name = $${paramCount}`;
+      values.push(last_name.trim());
+      paramCount++;
+    }
+
+    query += ` WHERE id = $${paramCount}`;
+    values.push(user_id);
+
+    await pool.query(query, values);
+
+    // Return updated profile
+    const result = await pool.query(
+      `SELECT id, first_name, last_name, email, college, created_at, is_verified 
+       FROM users WHERE id = $1`,
+      [user_id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error.");
+  }
+});
