@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("./db/db");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
 const { canRequestReset } = require("./utils/rateLimiter");
@@ -23,6 +24,21 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// JWT verification middleware
+function jwtMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).send("401 Unauthorized. No token provided.");
+  }
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (err) {
+    return res.status(401).send("401 Unauthorized. Invalid or expired token.");
+  }
+}
 
 // Register the user
 app.post("/register", async (req, res) => {
@@ -79,10 +95,9 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
-    const result = await pool.query(
-      `SELECT password FROM users WHERE email = $1`,
-      [email_entry]
-    );
+    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+      email_entry,
+    ]);
 
     if (result.rows.length === 0) {
       return res.status(404).send("User not found.");
@@ -100,10 +115,14 @@ app.post("/login", async (req, res) => {
     }
 
     const match = await bcrypt.compare(password_entry, result.rows[0].password);
+
     if (match) {
-      return res
-        .status(200)
-        .json({ token: "fake-session-token", email: email_entry });
+      const token = jwt.sign(
+        { id: result.rows[0].id, email: result.rows[0].email },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+      return res.status(200).json({ token: token, email: email_entry });
     } else {
       return res.status(401).send("Invalid password. Try again.");
     }
@@ -114,7 +133,7 @@ app.post("/login", async (req, res) => {
 });
 
 // Fetch listings with search and sort
-app.get("/listings", async (req, res) => {
+app.get("/listings", jwtMiddleware, async (req, res) => {
   const { search, sort } = req.query;
 
   const sortOptions = {
@@ -168,7 +187,7 @@ app.get("/listings", async (req, res) => {
 });
 
 // Post new listings
-app.post("/listings", async (req, res) => {
+app.post("/listings", jwtMiddleware, async (req, res) => {
   const { title, categories, price, description, college, image_urls } =
     req.body;
 

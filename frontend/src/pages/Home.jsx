@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import * as jwt_decode from "jwt-decode";
 
 function Home() {
   const navigate = useNavigate();
@@ -24,17 +25,37 @@ function Home() {
     });
 
   useEffect(() => {
-    const session = localStorage.getItem("session");
-    if (!session) {
+    const token = localStorage.getItem("token");
+    if (!token) {
       navigate("/");
+    } else {
+      try {
+        const { exp } = jwt_decode.default(token);
+        if (Date.now() >= exp * 1000) {
+          localStorage.removeItem("token");
+          navigate("/");
+        }
+      } catch (e) {
+        localStorage.removeItem("token");
+        navigate("/");
+      }
     }
 
     async function fetchListings() {
       try {
-        const res = await fetch("http://localhost:3001/listings");
+        const res = await fetch("http://localhost:3001/listings", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to fetch listings");
+        }
+
         const data = await res.json();
         setListings(data);
-        // console.log(data);
       } catch (err) {
         console.error(err);
       }
@@ -45,7 +66,7 @@ function Home() {
 
   async function handleLogout(e) {
     e.preventDefault();
-    localStorage.removeItem("session");
+    localStorage.removeItem("token");
     navigate("/");
   }
 

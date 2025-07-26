@@ -18,14 +18,16 @@ const Login = () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email_entry: email, password_entry: password }),
       });
 
       const data = await res.text();
       if (res.ok) {
         const json = JSON.parse(data);
-        localStorage.setItem("session", json.token);
+        localStorage.setItem("token", json.token);
         navigate("/home");
       } else {
         setMessage(data || "Login failed.");

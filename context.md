@@ -192,30 +192,50 @@
 
 ### users
 
-| Column     | Type    | Nullable | Default                           | Description       |
-| ---------- | ------- | -------- | --------------------------------- | ----------------- |
-| id         | integer | not null | nextval('users_id_seq'::regclass) | Primary key       |
-| first_name | text    | not null |                                   | User’s first name |
-| last_name  | text    | not null |                                   | User’s last name  |
-| email      | text    | not null |                                   | User’s email      |
-| college    | text    | not null |                                   | User’s college    |
+| Column      | Type      | Nullable | Default            | Description        |
+| ----------- | --------- | -------- | ------------------ | ------------------ |
+| id          | UUID      | not null | uuid_generate_v4() | Primary key        |
+| first_name  | text      | not null |                    | User's first name  |
+| last_name   | text      | not null |                    | User's last name   |
+| email       | text      | not null |                    | User's email       |
+| college     | text      | not null |                    | User's college     |
+| password    | text      | not null |                    | Hashed password    |
+| created_at  | timestamp |          | CURRENT_TIMESTAMP  | Account creation   |
+| is_verified | boolean   | not null | false              | Email verification |
+
+Indexes:
+
+- users_pkey PRIMARY KEY (id)
+- users_email_unique UNIQUE CONSTRAINT (email)
+
+Referenced by:
+
+- email_verification_codes (user_id foreign key)
+- password_reset_tokens (user_id foreign key)
+- listings (user_id foreign key)
 
 ---
 
 ### listings
 
-| Column      | Type          | Nullable | Default                              | Description           |
-| ----------- | ------------- | -------- | ------------------------------------ | --------------------- |
-| id          | integer       | not null | nextval('listings_id_seq'::regclass) | Primary key           |
-| name        | text          | not null |                                      | Listing title         |
-| price       | numeric(10,2) | not null |                                      | Listing price         |
-| description | text          | not null |                                      | Listing description   |
-| posted_at   | timestamp     | not null | CURRENT_TIMESTAMP                    | Time posted           |
-| college     | text          | not null | 'mit'::text                          | College (default MIT) |
+| Column      | Type          | Nullable | Default            | Description           |
+| ----------- | ------------- | -------- | ------------------ | --------------------- |
+| id          | UUID          | not null | uuid_generate_v4() | Primary key           |
+| title       | text          | not null |                    | Listing title         |
+| price       | numeric(10,2) | not null |                    | Listing price         |
+| description | text          | not null |                    | Listing description   |
+| posted_at   | timestamp     | not null | CURRENT_TIMESTAMP  | Time posted           |
+| college     | text          | not null | 'mit'::text        | College (default MIT) |
+| user_id     | UUID          |          |                    | FK to users(id)       |
+| category    | text          |          |                    | Listing category      |
 
 Indexes:
 
 - listings_pkey PRIMARY KEY (id)
+
+Foreign-key constraints:
+
+- user_id REFERENCES users(id) ON DELETE CASCADE
 
 Referenced by:
 
@@ -226,13 +246,13 @@ Referenced by:
 
 ### listing_images
 
-| Column      | Type      | Nullable | Default                                    | Description        |
-| ----------- | --------- | -------- | ------------------------------------------ | ------------------ |
-| id          | integer   | not null | nextval('listing_images_id_seq'::regclass) | Primary key        |
-| listing_id  | integer   |          |                                            | FK to listings(id) |
-| image_url   | text      | not null |                                            | Image URL          |
-| uploaded_at | timestamp | not null | CURRENT_TIMESTAMP                          | Upload time        |
-| is_cover    | boolean   | not null | false                                      | Is cover image     |
+| Column      | Type      | Nullable | Default            | Description        |
+| ----------- | --------- | -------- | ------------------ | ------------------ |
+| id          | UUID      | not null | uuid_generate_v4() | Primary key        |
+| listing_id  | UUID      |          |                    | FK to listings(id) |
+| image_url   | text      | not null |                    | Image URL          |
+| uploaded_at | timestamp | not null | CURRENT_TIMESTAMP  | Upload time        |
+| is_cover    | boolean   | not null | false              | Is cover image     |
 
 Indexes:
 
@@ -244,19 +264,55 @@ Foreign-key constraints:
 
 ---
 
-### password_reset_tokens
+### listing_categories
 
-| Column     | Type                     | Nullable | Default                                           | Description       |
-| ---------- | ------------------------ | -------- | ------------------------------------------------- | ----------------- |
-| id         | integer                  | not null | nextval('password_reset_tokens_id_seq'::regclass) | Primary key       |
-| user_id    | integer                  | not null |                                                   | FK to users(id)   |
-| token      | text                     | not null |                                                   | Reset token       |
-| expires_at | timestamp with time zone | not null |                                                   | Expiration time   |
-| used       | boolean                  |          | false                                             | If token was used |
+| Column      | Type | Nullable | Default | Description          |
+| ----------- | ---- | -------- | ------- | -------------------- |
+| listing_id  | UUID | not null |         | FK to listings(id)   |
+| category_id | UUID | not null |         | FK to categories(id) |
 
 Indexes:
 
-- password_reset_tokens_pkey PRIMARY KEY (id)
+- listing_categories_pkey PRIMARY KEY (listing_id, category_id)
+
+Foreign-key constraints:
+
+- listing_id REFERENCES listings(id) ON DELETE CASCADE
+- category_id REFERENCES categories(id) ON DELETE CASCADE
+
+---
+
+### categories
+
+| Column | Type | Nullable | Default            | Description   |
+| ------ | ---- | -------- | ------------------ | ------------- |
+| id     | UUID | not null | uuid_generate_v4() | Primary key   |
+| name   | text | not null |                    | Category name |
+
+Indexes:
+
+- categories_pkey PRIMARY KEY (id)
+- categories_name_key UNIQUE CONSTRAINT (name)
+
+Referenced by:
+
+- listing_categories (category_id foreign key)
+
+---
+
+### password_reset_tokens
+
+| Column     | Type                     | Nullable | Default            | Description       |
+| ---------- | ------------------------ | -------- | ------------------ | ----------------- |
+| token      | UUID                     | not null | uuid_generate_v4() | Primary key       |
+| user_id    | UUID                     |          |                    | FK to users(id)   |
+| expires_at | timestamp with time zone | not null |                    | Expiration time   |
+| used       | boolean                  | not null | false              | If token was used |
+| created_at | timestamp                | not null | CURRENT_TIMESTAMP  | Token creation    |
+
+Indexes:
+
+- password_reset_tokens_pkey PRIMARY KEY (token)
 
 Foreign-key constraints:
 
@@ -266,8 +322,22 @@ Foreign-key constraints:
 
 ### email_verification_codes
 
-- **Not found in your DB yet!**  
-  (You’ll need to create this table as discussed in previous steps.)
+| Column       | Type      | Nullable | Default           | Description                  |
+| ------------ | --------- | -------- | ----------------- | ---------------------------- |
+| user_id      | UUID      | not null |                   | Primary key, FK to users(id) |
+| code         | text      | not null |                   | 6-digit verification code    |
+| expires_at   | timestamp | not null |                   | Code expiration              |
+| last_sent    | timestamp | not null |                   | Last sent timestamp          |
+| created_at   | timestamp | not null | CURRENT_TIMESTAMP | Code creation                |
+| resend_count | integer   | not null | 0                 | Rate limiting counter        |
+
+Indexes:
+
+- email_verification_codes_pkey PRIMARY KEY (user_id)
+
+Foreign-key constraints:
+
+- user_id REFERENCES users(id) ON DELETE CASCADE
 
 ---
 
