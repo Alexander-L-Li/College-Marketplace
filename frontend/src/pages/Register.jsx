@@ -5,9 +5,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 const Register = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,12 +24,6 @@ const Register = () => {
       return;
     }
 
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/register`, {
         method: "POST",
@@ -37,6 +31,7 @@ const Register = () => {
         body: JSON.stringify({
           first_name: firstName,
           last_name: lastName,
+          username,
           email,
           password,
         }),
@@ -96,6 +91,14 @@ const Register = () => {
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:ring-2 focus:ring-black transition-all"
           />
           <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:ring-2 focus:ring-black transition-all"
+          />
+          <input
             type="email"
             placeholder="Email (.edu required)"
             value={email}
@@ -111,16 +114,6 @@ const Register = () => {
             required
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:ring-2 focus:ring-black transition-all"
           />
-          {password.length > 0 && (
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:ring-2 focus:ring-black transition-all"
-            />
-          )}
           <button
             type="submit"
             disabled={isLoading}

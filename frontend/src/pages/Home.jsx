@@ -162,6 +162,10 @@ function Home() {
                 <p className="text-lg font-semibold text-black">
                   ${listing.price}
                 </p>
+                <p className="text-sm text-gray-600">
+                  by {listing.first_name} {listing.last_name} (@
+                  {listing.username})
+                </p>
               </div>
             </div>
           </div>

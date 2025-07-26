@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +21,10 @@ const Login = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email_entry: email, password_entry: password }),
+        body: JSON.stringify({
+          email_entry: emailOrUsername,
+          password_entry: password,
+        }),
       });
 
       const data = await res.text();
@@ -62,10 +65,10 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
-            type="email"
-            placeholder="Email (.edu)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Username or Email (.edu)"
+            value={emailOrUsername}
+            onChange={(e) => setEmailOrUsername(e.target.value)}
             required
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black transition-all"
           />

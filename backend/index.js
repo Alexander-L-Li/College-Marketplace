@@ -42,7 +42,7 @@ function jwtMiddleware(req, res, next) {
 
 // Register the user
 app.post("/register", async (req, res) => {
-  const { first_name, last_name, email, password } = req.body;
+  const { first_name, last_name, email, password, username } = req.body;
 
   const code = generateSixDigitCode();
   const expiresAt = new Date(Date.now() + CODE_EXPIRY_MS);
@@ -52,15 +52,43 @@ app.post("/register", async (req, res) => {
     return res.status(400).send("Email must be .edu");
   }
 
+  // Username validation
+  if (!username || username.trim().length < 3 || username.trim().length > 30) {
+    return res
+      .status(400)
+      .send("Username must be between 3 and 30 characters.");
+  }
+
+  // Username format validation (alphanumeric + underscores only)
+  const usernameRegex = /^[a-zA-Z0-9_]+$/;
+  if (!usernameRegex.test(username)) {
+    return res
+      .status(400)
+      .send("Username can only contain letters, numbers, and underscores.");
+  }
+
+  // Check for reserved usernames
+  const reservedUsernames = [
+    "admin",
+    "moderator",
+    "support",
+    "help",
+    "info",
+    "system",
+  ];
+  if (reservedUsernames.includes(username.toLowerCase())) {
+    return res.status(400).send("Username is reserved and cannot be used.");
+  }
+
   const college = email.split("@")[1].split(".")[0];
 
   try {
     const hashed_password = await bcrypt.hash(password, 10);
     const newUser = await pool.query(
-      `INSERT INTO users (first_name, last_name, email, college, password)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (first_name, last_name, email, college, password, username)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [first_name, last_name, email, college, hashed_password]
+      [first_name, last_name, email, college, hashed_password, username.trim()]
     );
 
     const userId = newUser.rows[0].id;
@@ -83,7 +111,20 @@ app.post("/register", async (req, res) => {
   } catch (err) {
     console.error(err);
     if (err.code == "23505") {
-      res.status(409).json({ error: "Account already exists, please log in!" });
+      // Check if it's a username or email conflict
+      if (err.constraint === "users_username_key") {
+        res
+          .status(409)
+          .json({ error: "Username already taken, please choose another." });
+      } else if (err.constraint === "users_email_unique") {
+        res
+          .status(409)
+          .json({ error: "Account already exists, please log in!" });
+      } else {
+        res
+          .status(409)
+          .json({ error: "Account already exists, please log in!" });
+      }
     } else {
       res.status(500).send("Network error.");
     }
@@ -95,34 +136,41 @@ app.post("/login", async (req, res) => {
   const { email_entry, password_entry } = req.body;
 
   try {
-    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
-      email_entry,
-    ]);
+    // Check if input is email or username
+    const isEmail = email_entry.includes("@");
+
+    let result;
+    if (isEmail) {
+      result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+        email_entry,
+      ]);
+    } else {
+      result = await pool.query(`SELECT * FROM users WHERE username = $1`, [
+        email_entry,
+      ]);
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).send("User not found.");
     }
 
-    const verificationQuery = await pool.query(
-      `SELECT password, is_verified FROM users WHERE email = $1`,
-      [email_entry]
-    );
+    const user = result.rows[0];
 
-    if (!verificationQuery.rows[0].is_verified) {
+    if (!user.is_verified) {
       return res
         .status(403)
         .send("Please verify your email before logging in.");
     }
 
-    const match = await bcrypt.compare(password_entry, result.rows[0].password);
+    const match = await bcrypt.compare(password_entry, user.password);
 
     if (match) {
       const token = jwt.sign(
-        { id: result.rows[0].id, email: result.rows[0].email },
+        { id: user.id, email: user.email },
         process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
-      return res.status(200).json({ token: token, email: email_entry });
+      return res.status(200).json({ token: token, email: user.email });
     } else {
       return res.status(401).send("Invalid password. Try again.");
     }
@@ -162,6 +210,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
 
     const listingsQuery = `
     SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at, 
+    u.first_name, u.last_name, u.username,
     (
     SELECT image_url 
     FROM listing_images 
@@ -171,11 +220,12 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     ARRAY_AGG(DISTINCT c.name) AS categories,
     ARRAY_AGG(DISTINCT i.image_url) AS images
     FROM listings l
+    LEFT JOIN users u ON l.user_id = u.id
     LEFT JOIN listing_categories lc ON l.id = lc.listing_id
     LEFT JOIN categories c ON lc.category_id = c.id
     LEFT JOIN listing_images i ON l.id = i.listing_id
     ${whereClause}
-    GROUP BY l.id
+    GROUP BY l.id, u.first_name, u.last_name, u.username
     ORDER BY ${orderBy};`;
 
     const result = await pool.query(listingsQuery, values);
@@ -199,10 +249,10 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
 
   try {
     const newListingQuery = await pool.query(
-      `INSERT INTO listings (title, price, description, college)
+      `INSERT INTO listings (title, price, description, college, user_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [title, price, description, college]
+      [title, price, description, college, req.user.id]
     );
     const newListingId = newListingQuery.rows[0].id;
 
@@ -391,7 +441,7 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
   const user_id = req.user.id;
   try {
     const result = await pool.query(
-      `SELECT id, first_name, last_name, email, college, created_at, is_verified FROM users WHERE id = $1`,
+      `SELECT id, first_name, last_name, email, college, created_at, is_verified, username FROM users WHERE id = $1`,
       [user_id]
     );
 
@@ -408,10 +458,10 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
 
 // Update current user's profile info
 app.patch("/profile", jwtMiddleware, async (req, res) => {
-  const { first_name, last_name } = req.body;
+  const { first_name, last_name, username } = req.body;
   const user_id = req.user.id;
 
-  if (!first_name && !last_name) {
+  if (!first_name && !last_name && !username) {
     return res.status(400).send("At least one field must be provided.");
   }
 
@@ -439,6 +489,51 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
       paramCount++;
     }
 
+    if (username) {
+      if (username.trim().length < 3 || username.trim().length > 30) {
+        return res
+          .status(400)
+          .send("Username must be between 3 and 30 characters.");
+      }
+
+      // Username format validation (alphanumeric + underscores only)
+      const usernameRegex = /^[a-zA-Z0-9_]+$/;
+      if (!usernameRegex.test(username)) {
+        return res
+          .status(400)
+          .send("Username can only contain letters, numbers, and underscores.");
+      }
+
+      // Check for reserved usernames
+      const reservedUsernames = [
+        "admin",
+        "moderator",
+        "support",
+        "help",
+        "info",
+        "system",
+      ];
+      if (reservedUsernames.includes(username.toLowerCase())) {
+        return res.status(400).send("Username is reserved and cannot be used.");
+      }
+
+      // Check username uniqueness (excluding current user)
+      const existingUser = await pool.query(
+        `SELECT id FROM users WHERE username = $1 AND id != $2`,
+        [username.trim(), user_id]
+      );
+      if (existingUser.rows.length > 0) {
+        return res
+          .status(409)
+          .send("Username already taken, please choose another.");
+      }
+
+      if (first_name || last_name) query += ", ";
+      query += `username = $${paramCount}`;
+      values.push(username.trim());
+      paramCount++;
+    }
+
     query += ` WHERE id = $${paramCount}`;
     values.push(user_id);
 
@@ -446,7 +541,7 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
 
     // Return updated profile
     const result = await pool.query(
-      `SELECT id, first_name, last_name, email, college, created_at, is_verified 
+      `SELECT id, first_name, last_name, email, college, created_at, is_verified, username 
        FROM users WHERE id = $1`,
       [user_id]
     );

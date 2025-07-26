@@ -50,6 +50,7 @@
 - ✅ Email verification UI w/ cooldown and redirect
 - ✅ JWT Session Management (token signing, verification, middleware)
 - ✅ Frontend JWT integration (storage, expiration checks, protected routes)
+- ✅ Username system (registration, profile updates, display in listings)
 
 ---
 
@@ -194,21 +195,23 @@
 
 ### users
 
-| Column      | Type      | Nullable | Default            | Description        |
-| ----------- | --------- | -------- | ------------------ | ------------------ |
-| id          | UUID      | not null | uuid_generate_v4() | Primary key        |
-| first_name  | text      | not null |                    | User's first name  |
-| last_name   | text      | not null |                    | User's last name   |
-| email       | text      | not null |                    | User's email       |
-| college     | text      | not null |                    | User's college     |
-| password    | text      | not null |                    | Hashed password    |
-| created_at  | timestamp |          | CURRENT_TIMESTAMP  | Account creation   |
-| is_verified | boolean   | not null | false              | Email verification |
+| Column      | Type        | Nullable | Default            | Description        |
+| ----------- | ----------- | -------- | ------------------ | ------------------ |
+| id          | UUID        | not null | uuid_generate_v4() | Primary key        |
+| first_name  | text        | not null |                    | User's first name  |
+| last_name   | text        | not null |                    | User's last name   |
+| username    | varchar(30) | not null |                    | Unique username    |
+| email       | text        | not null |                    | User's email       |
+| college     | text        | not null |                    | User's college     |
+| password    | text        | not null |                    | Hashed password    |
+| created_at  | timestamp   |          | CURRENT_TIMESTAMP  | Account creation   |
+| is_verified | boolean     | not null | false              | Email verification |
 
 Indexes:
 
 - users_pkey PRIMARY KEY (id)
 - users_email_unique UNIQUE CONSTRAINT (email)
+- users_username_key UNIQUE CONSTRAINT (username)
 
 Referenced by:
 
@@ -351,11 +354,14 @@ Foreign-key constraints:
 - ✅ On registration, generate and email a 6-digit verification code, and create an entry in `email_verification_codes`.
 - ✅ Add rate limiting to `/resend-verification` and `/verify-email` endpoints.
 - ✅ Replace fake session token in `/login` with JWT or real session management.
+- ✅ User profile management (GET /profile, PATCH /profile with username support)
 - [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
 
 ### Frontend
 
 - ✅ After successful registration, navigate user to `/EmailVerification` with their user_id as a query param.
+- ✅ Username field in registration form with validation
+- ✅ Display seller usernames in listings
 - [ ] Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
 
 ### General
@@ -370,13 +376,18 @@ Foreign-key constraints:
 
 - ✅ Finalize `/verify-email` logic (code checking, expiry)
 - ✅ Add rate limit + cooldown to `/resend-verification`
+- ✅ User profile management with username support
+- ✅ Login accepts email or username
 - [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
 - [ ] Handle token expiration and logout (backend side)
 
 ### Frontend
 
 - ✅ Navigate to EmailVerification after successful signup
-- [ ] Animate Confirm Password on password input change
+- ✅ Username field in registration form
+- ✅ Display seller information in listings
+- ✅ Login with email or username
+- ✅ Removed confirm password from registration
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
 
@@ -395,9 +406,11 @@ Foreign-key constraints:
 
 **Login Route (`/login` POST):**
 
+- Accepts either email or username in `email_entry` field
+- Detects input type by checking for '@' symbol
 - Signs JWT with user `id` and `email` payload
 - Sets 1-hour expiration (`expiresIn: "1h"`)
-- Returns `{ token: token, email: email_entry }` on success
+- Returns `{ token: token, email: user.email }` on success
 - Checks `is_verified` status before allowing login
 
 **Protected Routes:**
@@ -441,6 +454,71 @@ Foreign-key constraints:
 - Backend validates tokens on every protected request
 - Frontend removes invalid tokens and redirects to login
 - No sensitive data stored in JWT payload
+
+---
+
+## 👤 Username System Implementation (June 2024)
+
+### Database Schema
+
+**Users Table Updates:**
+
+- Added `username VARCHAR(30) UNIQUE NOT NULL` column
+- Unique constraint prevents duplicate usernames
+- Username format: 3-30 characters, alphanumeric + underscores only
+
+### Backend Implementation
+
+**Registration Route (`/register` POST):**
+
+- Added username validation (length, format, reserved names)
+- Username uniqueness check during registration
+- Specific error messages for username conflicts vs email conflicts
+
+**Profile Routes:**
+
+- `GET /profile`: Returns username in user profile data
+- `PATCH /profile`: Allows username updates with validation
+- Username uniqueness check excludes current user during updates
+
+**Listings Route (`/listings` GET):**
+
+- Includes seller information (first_name, last_name, username)
+- JOIN with users table to display seller details
+
+### Frontend Implementation
+
+**Registration Form (`Register.jsx`):**
+
+- Added username input field with helpful placeholder
+- Username validation feedback from backend
+- Consistent styling with other form fields
+
+**Listings Display (`Home.jsx`):**
+
+- Shows seller information: "by John Doe (@johndoe)"
+- Displays both real name and username for identification
+
+### Username Validation Rules
+
+1. **Length:** 3-30 characters
+2. **Format:** Letters, numbers, underscores only (regex: `/^[a-zA-Z0-9_]+$/`)
+3. **Reserved Names:** Cannot use admin, moderator, support, help, info, system
+4. **Uniqueness:** Must be unique across all users
+5. **Case Insensitive:** Reserved name checks are case-insensitive
+
+### Error Handling
+
+- **409 Conflict:** Username already taken
+- **400 Bad Request:** Invalid format, reserved name, or length issues
+- **Specific Messages:** Different error messages for username vs email conflicts
+
+### Future Considerations
+
+- **Username Changes:** Currently allowed, consider cooldown period
+- **Messaging System:** Ready for @username mentions and direct messaging
+- **Profile URLs:** Could use usernames for public profile URLs
+- **Search:** Could add username search functionality
 
 ---
 
