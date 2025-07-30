@@ -377,7 +377,7 @@ Foreign-key constraints:
 - ✅ Finalize `/verify-email` logic (code checking, expiry)
 - ✅ Add rate limit + cooldown to `/resend-verification`
 - ✅ User profile management with username support
-- ✅ Login accepts email or username
+- ✅ Login accepts email or username (automatic detection)
 - [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
 - [ ] Handle token expiration and logout (backend side)
 
@@ -386,8 +386,8 @@ Foreign-key constraints:
 - ✅ Navigate to EmailVerification after successful signup
 - ✅ Username field in registration form
 - ✅ Display seller information in listings
-- ✅ Login with email or username
-- ✅ Removed confirm password from registration
+- ✅ Login with email or username (flexible input field)
+- ✅ Removed confirm password from registration (simplified UX)
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
 
@@ -407,10 +407,11 @@ Foreign-key constraints:
 **Login Route (`/login` POST):**
 
 - Accepts either email or username in `email_entry` field
-- Detects input type by checking for '@' symbol
+- Detects input type by checking for '@' symbol (`email_entry.includes('@')`)
+- Queries database by email OR username based on input type
 - Signs JWT with user `id` and `email` payload
 - Sets 1-hour expiration (`expiresIn: "1h"`)
-- Returns `{ token: token, email: user.email }` on success
+- Returns `{ token: token, email: user.email }` on success (always returns actual email)
 - Checks `is_verified` status before allowing login
 
 **Protected Routes:**
@@ -493,11 +494,20 @@ Foreign-key constraints:
 - Added username input field with helpful placeholder
 - Username validation feedback from backend
 - Consistent styling with other form fields
+- **Simplified UX:** Removed confirm password field and validation
+- Single password field for streamlined registration
 
 **Listings Display (`Home.jsx`):**
 
 - Shows seller information: "by John Doe (@johndoe)"
 - Displays both real name and username for identification
+
+**Login Form (`Login.jsx`):**
+
+- Flexible input field accepts email or username
+- Placeholder: "Username or Email (.edu)"
+- Automatic backend detection of input type
+- Simplified user experience for login
 
 ### Username Validation Rules
 
@@ -519,6 +529,7 @@ Foreign-key constraints:
 - **Messaging System:** Ready for @username mentions and direct messaging
 - **Profile URLs:** Could use usernames for public profile URLs
 - **Search:** Could add username search functionality
+- **Login Flexibility:** Users can login with email or username seamlessly
 
 ---
 
