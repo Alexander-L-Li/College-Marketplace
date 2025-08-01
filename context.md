@@ -378,6 +378,9 @@ Foreign-key constraints:
 - ✅ Add rate limit + cooldown to `/resend-verification`
 - ✅ User profile management with username support
 - ✅ Login accepts email or username (automatic detection)
+- ✅ College-specific dorm system with MIT and Harvard support
+- ✅ Dorm selection in profile updates
+- ✅ Dorm information in listings display
 - [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
 - [ ] Handle token expiration and logout (backend side)
 
@@ -390,6 +393,9 @@ Foreign-key constraints:
 - ✅ Removed confirm password from registration (simplified UX)
 - ✅ Profile page with edit functionality and mobile-first design
 - ✅ Profile icon in Home page header for easy navigation
+- ✅ Enhanced Profile UI with lovable-inspired design
+- ✅ Dorm selection functionality in profile
+- ✅ Profile picture upload interface (UI ready)
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
 
@@ -514,8 +520,11 @@ Foreign-key constraints:
 **Profile Page (`Profile.jsx`):**
 
 - Mobile-first design with clean, intuitive interface
-- Profile information display (name, username, email, college, join date, verification status)
-- Inline editing functionality for name and username
+- Profile information display (name, username, email, college, dorm, join date, verification status)
+- Enhanced UI with lovable-inspired design
+- Profile picture upload interface (camera icon)
+- Dorm selection dropdown with college-specific options
+- Inline editing functionality for name, username, and dorm
 - Profile icon in Home page header for easy navigation
 - Back navigation to Home page
 - Logout functionality with token cleanup
@@ -543,6 +552,82 @@ Foreign-key constraints:
 - **Profile URLs:** Could use usernames for public profile URLs
 - **Search:** Could add username search functionality
 - **Login Flexibility:** Users can login with email or username seamlessly
+- **Profile Pictures:** Backend storage and retrieval needed
+- **Additional Colleges:** Easy to add new colleges and dorms
+
+---
+
+## 🏠 College-Specific Dorm System (June 2024)
+
+### Database Schema
+
+**Colleges Table:**
+
+- `id` (UUID) - Primary key
+- `name` (VARCHAR) - College name (MIT, Harvard)
+- `domain` (VARCHAR) - Email domain (mit.edu, harvard.edu)
+- `created_at` (TIMESTAMP) - Creation time
+
+**Dorms Table:**
+
+- `id` (UUID) - Primary key
+- `college_id` (UUID) - Foreign key to colleges
+- `name` (VARCHAR) - Dorm name
+- `created_at` (TIMESTAMP) - Creation time
+- Unique constraint on (college_id, name)
+
+**Users Table Updates:**
+
+- `dorm_id` (UUID) - Foreign key to dorms (optional)
+
+### Backend Implementation
+
+**Dorm Routes:**
+
+- `GET /dorms/:college` - Fetch dorms for specific college
+- Updated `GET /profile` - Include dorm information
+- Updated `PATCH /profile` - Handle dorm updates with validation
+
+**Validation Logic:**
+
+- Dorm must belong to user's college
+- Dorm selection is optional
+- Proper error handling for invalid dorm selections
+
+### Frontend Implementation
+
+**Profile Page:**
+
+- Dorm dropdown populated from college-specific API
+- Dorm information displayed in profile view
+- Dorm selection in edit mode
+
+**Listings Display:**
+
+- Dorm information shown in listing cards
+- Format: "by John Doe (@johndoe) • Baker House"
+
+### Current Colleges & Dorms
+
+**MIT (11 dorms):**
+
+- Baker House, Burton Conner House, East Campus, MacGregor House
+- Maseeh Hall, McCormick Hall, New House, Next House
+- Random Hall, Simmons Hall, Out of Campus Housing
+
+**Harvard (13 dorms):**
+
+- Adams House, Cabot House, Currier House, Dunster House
+- Eliot House, Kirkland House, Leverett House, Lowell House
+- Mather House, Pforzheimer House, Quincy House, Winthrop House
+- Out of Campus Housing
+
+### Scalability Features
+
+- **Easy College Addition:** Insert new college and dorms
+- **College Detection:** Auto-detect from email domain
+- **Flexible Dorm Count:** Each college can have different numbers of dorms
+- **Data Integrity:** Foreign key constraints prevent invalid selections
 
 ---
 

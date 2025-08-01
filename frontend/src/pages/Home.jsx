@@ -189,6 +189,7 @@ function Home() {
                 <p className="text-sm text-gray-600">
                   by {listing.first_name} {listing.last_name} (@
                   {listing.username})
+                  {listing.dorm_name && ` • ${listing.dorm_name}`}
                 </p>
               </div>
             </div>

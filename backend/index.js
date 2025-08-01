@@ -80,7 +80,15 @@ app.post("/register", async (req, res) => {
     return res.status(400).send("Username is reserved and cannot be used.");
   }
 
-  const college = email.split("@")[1].split(".")[0];
+  const collegeDomain = email.split("@")[1].split(".")[0];
+
+  // Map college domains to proper display names
+  const collegeMap = {
+    mit: "MIT",
+    harvard: "Harvard",
+  };
+
+  const college = collegeMap[collegeDomain] || collegeDomain;
 
   try {
     const hashed_password = await bcrypt.hash(password, 10);
@@ -180,6 +188,29 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// Get dorms for a specific college
+app.get("/dorms/:college", async (req, res) => {
+  const { college } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT d.id, d.name 
+      FROM dorms d 
+      JOIN colleges c ON d.college_id = c.id 
+      WHERE c.name = $1 
+      ORDER BY d.name
+    `,
+      [college]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error.");
+  }
+});
+
 // Fetch listings with search and sort
 app.get("/listings", jwtMiddleware, async (req, res) => {
   const { search, sort } = req.query;
@@ -210,7 +241,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
 
     const listingsQuery = `
     SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at, 
-    u.first_name, u.last_name, u.username,
+    u.first_name, u.last_name, u.username, d.name as dorm_name,
     (
     SELECT image_url 
     FROM listing_images 
@@ -221,11 +252,12 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     ARRAY_AGG(DISTINCT i.image_url) AS images
     FROM listings l
     LEFT JOIN users u ON l.user_id = u.id
+    LEFT JOIN dorms d ON u.dorm_id = d.id
     LEFT JOIN listing_categories lc ON l.id = lc.listing_id
     LEFT JOIN categories c ON lc.category_id = c.id
     LEFT JOIN listing_images i ON l.id = i.listing_id
     ${whereClause}
-    GROUP BY l.id, u.first_name, u.last_name, u.username
+    GROUP BY l.id, u.first_name, u.last_name, u.username, d.name
     ORDER BY ${orderBy};`;
 
     const result = await pool.query(listingsQuery, values);
@@ -441,7 +473,10 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
   const user_id = req.user.id;
   try {
     const result = await pool.query(
-      `SELECT id, first_name, last_name, email, college, created_at, is_verified, username FROM users WHERE id = $1`,
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name
+       FROM users u 
+       LEFT JOIN dorms d ON u.dorm_id = d.id 
+       WHERE u.id = $1`,
       [user_id]
     );
 
@@ -458,10 +493,10 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
 
 // Update current user's profile info
 app.patch("/profile", jwtMiddleware, async (req, res) => {
-  const { first_name, last_name, username } = req.body;
+  const { first_name, last_name, username, dorm_id } = req.body;
   const user_id = req.user.id;
 
-  if (!first_name && !last_name && !username) {
+  if (!first_name && !last_name && !username && !dorm_id) {
     return res.status(400).send("At least one field must be provided.");
   }
 
@@ -534,6 +569,28 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
       paramCount++;
     }
 
+    if (dorm_id) {
+      // Validate that dorm_id exists and belongs to user's college
+      const dormCheck = await pool.query(
+        `
+        SELECT d.id FROM dorms d 
+        JOIN colleges c ON d.college_id = c.id 
+        JOIN users u ON u.college = c.name 
+        WHERE d.id = $1 AND u.id = $2
+      `,
+        [dorm_id, user_id]
+      );
+
+      if (dormCheck.rows.length === 0) {
+        return res.status(400).send("Invalid dorm selection.");
+      }
+
+      if (first_name || last_name || username) query += ", ";
+      query += `dorm_id = $${paramCount}`;
+      values.push(dorm_id);
+      paramCount++;
+    }
+
     query += ` WHERE id = $${paramCount}`;
     values.push(user_id);
 
@@ -541,8 +598,10 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
 
     // Return updated profile
     const result = await pool.query(
-      `SELECT id, first_name, last_name, email, college, created_at, is_verified, username 
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name
+       FROM users u 
+       LEFT JOIN dorms d ON u.dorm_id = d.id 
+       WHERE u.id = $1`,
       [user_id]
     );
 
