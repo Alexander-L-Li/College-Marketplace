@@ -573,6 +573,7 @@ Foreign-key constraints:
 - `id` (UUID) - Primary key
 - `college_id` (UUID) - Foreign key to colleges
 - `name` (VARCHAR) - Dorm name
+- `display_order` (INTEGER) - Custom sort order (999 for Off-Campus Housing)
 - `created_at` (TIMESTAMP) - Creation time
 - Unique constraint on (college_id, name)
 
@@ -613,14 +614,21 @@ Foreign-key constraints:
 
 - Baker House, Burton Conner House, East Campus, MacGregor House
 - Maseeh Hall, McCormick Hall, New House, Next House
-- Random Hall, Simmons Hall, Out of Campus Housing
+- Random Hall, Simmons Hall, Off-Campus Housing
 
 **Harvard (13 dorms):**
 
 - Adams House, Cabot House, Currier House, Dunster House
 - Eliot House, Kirkland House, Leverett House, Lowell House
 - Mather House, Pforzheimer House, Quincy House, Winthrop House
-- Out of Campus Housing
+- Off-Campus Housing
+
+### Recent Updates (June 2024)
+
+- ✅ **Name Change:** Updated "Out of Campus Housing" to "Off-Campus Housing" for better UX
+- ✅ **Display Order:** Added `display_order` column to dorms table for custom sorting
+- ✅ **Bottom Placement:** Configured "Off-Campus Housing" to appear at bottom of dropdown lists
+- ✅ **Alphabetical Sorting:** Regular dorms sorted alphabetically, Off-Campus Housing at bottom
 
 ### Scalability Features
 

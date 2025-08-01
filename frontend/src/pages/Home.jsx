@@ -100,9 +100,6 @@ function Home() {
         <div className="relative">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
-            <p className="text-gray-600 text-sm">
-              MIT's exclusive campus marketplace.
-            </p>
           </div>
 
           {/* Profile Icon - Top Right */}

@@ -199,7 +199,7 @@ app.get("/dorms/:college", async (req, res) => {
       FROM dorms d 
       JOIN colleges c ON d.college_id = c.id 
       WHERE c.name = $1 
-      ORDER BY d.name
+      ORDER BY d.display_order, d.name
     `,
       [college]
     );
