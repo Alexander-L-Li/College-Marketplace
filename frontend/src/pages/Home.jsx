@@ -97,11 +97,35 @@ function Home() {
     <div className="min-h-screen bg-white px-4 py-6">
       <div className="max-w mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
-          <p className="text-gray-600 text-sm">
-            MIT's exclusive campus marketplace.
-          </p>
+        <div className="relative">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
+            <p className="text-gray-600 text-sm">
+              MIT's exclusive campus marketplace.
+            </p>
+          </div>
+
+          {/* Profile Icon - Top Right */}
+          <button
+            onClick={() => navigate("/profile")}
+            className="absolute top-0 right-0 p-2 text-gray-600 hover:text-black transition-colors"
+            aria-label="Profile"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+          </button>
         </div>
 
         {/* Search Bar */}

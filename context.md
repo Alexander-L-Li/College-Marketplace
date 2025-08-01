@@ -388,6 +388,8 @@ Foreign-key constraints:
 - ✅ Display seller information in listings
 - ✅ Login with email or username (flexible input field)
 - ✅ Removed confirm password from registration (simplified UX)
+- ✅ Profile page with edit functionality and mobile-first design
+- ✅ Profile icon in Home page header for easy navigation
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
 
@@ -508,6 +510,17 @@ Foreign-key constraints:
 - Placeholder: "Username or Email (.edu)"
 - Automatic backend detection of input type
 - Simplified user experience for login
+
+**Profile Page (`Profile.jsx`):**
+
+- Mobile-first design with clean, intuitive interface
+- Profile information display (name, username, email, college, join date, verification status)
+- Inline editing functionality for name and username
+- Profile icon in Home page header for easy navigation
+- Back navigation to Home page
+- Logout functionality with token cleanup
+- Loading states and error handling
+- Success/error message display
 
 ### Username Validation Rules
 
