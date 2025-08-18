@@ -624,3 +624,39 @@ app.get("/categories", jwtMiddleware, async (req, res) => {
     res.status(500).send("Database error.");
   }
 });
+
+// Get individual listing by ID
+app.get("/listing/:id", jwtMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `SELECT 
+        l.id, l.title, l.price, l.description, l.posted_at, l.user_id,
+        u.first_name, u.last_name, u.username, u.college,
+        d.name as dorm_name,
+        COALESCE(array_remove(array_agg(DISTINCT c.name), NULL), ARRAY[]::text[]) as categories,
+        COALESCE(array_remove(array_agg(DISTINCT CASE WHEN li.image_url NOT LIKE 'blob:%' THEN json_build_object('id', li.id, 'image_url', li.image_url, 'is_cover', li.is_cover) END), NULL), ARRAY[]::json[]) as images
+      FROM listings l
+      LEFT JOIN users u ON l.user_id = u.id
+      LEFT JOIN dorms d ON u.dorm_id = d.id
+      LEFT JOIN listing_categories lc ON l.id = lc.listing_id
+      LEFT JOIN categories c ON lc.category_id = c.id
+      LEFT JOIN listing_images li ON l.id = li.listing_id
+      WHERE l.id = $1
+      GROUP BY l.id, l.title, l.price, l.description, l.posted_at, l.user_id, u.first_name, u.last_name, u.username, u.college, d.name`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("Listing not found.");
+    }
+
+    const listing = result.rows[0];
+
+    res.json(listing);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error.");
+  }
+});
