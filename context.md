@@ -674,7 +674,7 @@ Foreign-key constraints:
 - **Form State Management:** Controlled components, validation, error handling
 - **Authentication:** JWT-protected routes, user session management
 - **Responsive Design:** Mobile-first, Tailwind CSS styling
-- **Error Handling:** Validation errors, network errors, user feedback
+- **Error Handling:** Validation errors, network errors, user feedback.
 
 ---
 
