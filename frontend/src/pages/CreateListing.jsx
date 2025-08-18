@@ -15,6 +15,7 @@ function CreateListing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState([]);
+  const [showForm, setShowForm] = useState(false);
 
   // Check authentication on component mount
   useEffect(() => {
@@ -114,6 +115,61 @@ function CreateListing() {
     };
   }, [images]);
 
+  const isFormValid = () => {
+    return (
+      images.length > 0 &&
+      formData.title.trim() !== "" &&
+      formData.price !== "" &&
+      parseFloat(formData.price) > 0 &&
+      formData.description.trim() !== "" &&
+      formData.categories.length > 0
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!isFormValid()) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:3001/listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          price: parseFloat(formData.price),
+          description: formData.description,
+          categories: formData.categories,
+          college: "MIT", // TODO: Get from user profile
+          image_urls: images.map((image, index) => ({
+            url: image.preview, // For now, using preview URL. In production, this would be uploaded to S3
+            is_cover: image.is_cover,
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        // Success! Redirect to home page
+        navigate("/home");
+      } else {
+        const errorText = await response.text();
+        setError(errorText || "Failed to create listing");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white px-4 py-6">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -139,6 +195,13 @@ function CreateListing() {
             </svg>
           </button>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Image Upload Section */}
         <div className="space-y-4">
@@ -223,9 +286,147 @@ function CreateListing() {
                   </div>
                 ))}
               </div>
+
+              {/* Proceed to Form Button */}
+              <div className="pt-4">
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2"
+                >
+                  Proceed to Form
+                </button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Form Fields Section */}
+        {showForm && (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-black">Item Details</h2>
+
+            {/* Title Input */}
+            <div className="space-y-2">
+              <label
+                htmlFor="title"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Item Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="title"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="e.g., Black Patagonia Down Jacket"
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                required
+              />
+            </div>
+
+            {/* Price Input */}
+            <div className="space-y-2">
+              <label
+                htmlFor="price"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Price <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-3 text-gray-500">$</span>
+                <input
+                  type="number"
+                  id="price"
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, price: e.target.value }))
+                  }
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Description Input */}
+            <div className="space-y-2">
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Describe your item in detail..."
+                rows={4}
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none"
+                required
+              />
+            </div>
+
+            {/* Categories Multi-Select */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Categories <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.map((category) => (
+                  <label
+                    key={category.id}
+                    className="flex items-center space-x-2 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.categories.includes(category.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            categories: [...prev.categories, category.name],
+                          }));
+                        } else {
+                          setFormData((prev) => ({
+                            ...prev,
+                            categories: prev.categories.filter(
+                              (cat) => cat !== category.name
+                            ),
+                          }));
+                        }
+                      }}
+                      className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {category.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isFormValid()}
+                className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? "Creating Listing..." : "Create Listing"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

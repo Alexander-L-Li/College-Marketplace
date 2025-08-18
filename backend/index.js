@@ -611,3 +611,16 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
     res.status(500).send("Database error.");
   }
 });
+
+// Get all categories
+app.get("/categories", jwtMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM categories ORDER BY name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error.");
+  }
+});
