@@ -1,0 +1,65 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# AWS credentials and configuration
+.aws/
+aws-credentials.json
+aws-config.json
+*.pem
+*.key
+
+# Database credentials
+database-credentials.json
+db-credentials.json
+
+# JWT secrets
+jwt-secret.txt
+jwt-keys/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# Cache directories
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
