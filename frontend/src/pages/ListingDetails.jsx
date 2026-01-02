@@ -148,13 +148,15 @@ function ListingDetails() {
             </svg>
             <span>Back to Listings</span>
           </button>
-          <h1 className="text-2xl font-bold text-black">{listing.title}</h1>
+          <h1 className="hidden md:block text-2xl font-bold text-black">
+            {listing.title}
+          </h1>
           <div className="w-20"></div> {/* Spacer for centering */}
         </div>
 
         {/* Image Carousel */}
-        <div className="relative">
-          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+        <div className="relative flex justify-center">
+          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden w-full max-w-md lg:max-w-lg">
             {listing.images &&
             listing.images.length > 0 &&
             (listing.images[currentImageIndex]?.image_url ||
@@ -269,8 +271,8 @@ function ListingDetails() {
 
             {/* Description */}
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-black">Description</h3>
-              <p className="text-gray-700 leading-relaxed">
+              <h3 className="text-lg font-semibold text-black text-center">Description</h3>
+              <p className="text-gray-700 leading-relaxed text-center break-words overflow-wrap-anywhere max-w-full">
                 {listing.description}
               </p>
             </div>
@@ -278,8 +280,8 @@ function ListingDetails() {
             {/* Categories */}
             {listing.categories && listing.categories.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-black">Categories</h3>
-                <div className="flex flex-wrap gap-2">
+                <h3 className="text-lg font-semibold text-black text-center">Categories</h3>
+                <div className="flex flex-wrap gap-2 justify-center">
                   {listing.categories.map((category, index) => (
                     <span
                       key={index}
@@ -326,7 +328,6 @@ function ListingDetails() {
                 <p>
                   Posted: {new Date(listing.posted_at).toLocaleDateString()}
                 </p>
-                <p>ID: {listing.id}</p>
               </div>
             </div>
 

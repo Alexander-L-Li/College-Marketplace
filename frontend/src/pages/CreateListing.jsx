@@ -13,9 +13,11 @@ function CreateListing() {
     categories: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [uploadedImageKeys, setUploadedImageKeys] = useState([]); // Store S3 keys after upload
 
   // Check authentication on component mount
   useEffect(() => {
@@ -118,12 +120,87 @@ function CreateListing() {
   const isFormValid = () => {
     return (
       images.length > 0 &&
+      uploadedImageKeys.length === images.length && // All images must be uploaded
       formData.title.trim() !== "" &&
       formData.price !== "" &&
       parseFloat(formData.price) > 0 &&
       formData.description.trim() !== "" &&
       formData.categories.length > 0
     );
+  };
+
+  // Upload images to S3 before showing form
+  const handleUploadImages = async () => {
+    if (images.length === 0) {
+      setError("Please upload at least one image");
+      return;
+    }
+
+    setIsUploadingImages(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+
+      // Step 1: Get presigned upload URLs from backend
+      const filesData = images.map((img) => ({
+        filename: img.file.name,
+        contentType: img.file.type,
+      }));
+
+      const uploadUrlsResponse = await fetch(
+        "http://localhost:3001/s3/upload-urls",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ files: filesData }),
+        }
+      );
+
+      if (!uploadUrlsResponse.ok) {
+        const errorText = await uploadUrlsResponse.text();
+        throw new Error(errorText || "Failed to get upload URLs");
+      }
+
+      const { uploadUrls } = await uploadUrlsResponse.json();
+
+      // Step 2: Upload each image directly to S3 using presigned URLs
+      const uploadedKeys = [];
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        const { uploadURL, key } = uploadUrls[i];
+
+        // Upload file directly to S3
+        const uploadResponse = await fetch(uploadURL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": image.file.type,
+          },
+          body: image.file,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload image ${i + 1}`);
+        }
+
+        uploadedKeys.push({
+          key: key,
+          is_cover: image.is_cover,
+        });
+      }
+
+      // Step 3: Store S3 keys and show form
+      setUploadedImageKeys(uploadedKeys);
+      setShowForm(true);
+    } catch (err) {
+      console.error("Image upload error:", err);
+      setError(err.message || "Failed to upload images. Please try again.");
+    } finally {
+      setIsUploadingImages(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -149,9 +226,9 @@ function CreateListing() {
           description: formData.description,
           categories: formData.categories,
           college: "MIT", // TODO: Get from user profile
-          image_urls: images.map((image, index) => ({
-            url: image.preview, // For now, using preview URL. In production, this would be uploaded to S3
-            is_cover: image.is_cover,
+          image_urls: uploadedImageKeys.map((img) => ({
+            url: img.key, // S3 key (e.g., "listings/1234567890-filename.jpg")
+            is_cover: img.is_cover,
           })),
         }),
       });
@@ -290,10 +367,13 @@ function CreateListing() {
               {/* Proceed to Form Button */}
               <div className="pt-4">
                 <button
-                  onClick={() => setShowForm(true)}
-                  className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2"
+                  onClick={handleUploadImages}
+                  disabled={isUploadingImages}
+                  className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Proceed to Form
+                  {isUploadingImages
+                    ? "Uploading Images..."
+                    : "Proceed to Form"}
                 </button>
               </div>
             </div>

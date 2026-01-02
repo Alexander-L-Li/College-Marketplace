@@ -6,6 +6,7 @@ const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
 const { canRequestReset } = require("./utils/rateLimiter");
 const { v4: uuidv4 } = require("uuid");
+const { generateUploadURL, generateViewURL } = require("./config/s3");
 
 require("dotenv").config();
 
@@ -261,7 +262,54 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     ORDER BY ${orderBy};`;
 
     const result = await pool.query(listingsQuery, values);
-    res.json(result.rows);
+
+    // Convert S3 keys to viewable URLs
+    const listingsWithUrls = await Promise.all(
+      result.rows.map(async (listing) => {
+        const listingCopy = { ...listing };
+
+        // Generate view URL for cover image if it exists and is an S3 key
+        if (
+          listing.cover_image_url &&
+          !listing.cover_image_url.startsWith("http")
+        ) {
+          try {
+            listingCopy.cover_image_url = await generateViewURL(
+              listing.cover_image_url
+            );
+          } catch (err) {
+            console.error("Error generating cover image URL:", err);
+            listingCopy.cover_image_url = null;
+          }
+        }
+
+        // Generate view URLs for all images if they exist
+        if (listing.images && Array.isArray(listing.images)) {
+          listingCopy.images = await Promise.all(
+            listing.images.map(async (imageUrl) => {
+              // If it's already a full URL (legacy), return as-is
+              if (imageUrl && imageUrl.startsWith("http")) {
+                return imageUrl;
+              }
+              // If it's an S3 key, generate presigned URL
+              if (imageUrl && !imageUrl.startsWith("blob:")) {
+                try {
+                  return await generateViewURL(imageUrl);
+                } catch (err) {
+                  console.error("Error generating image URL:", err);
+                  return null;
+                }
+              }
+              return imageUrl;
+            })
+          );
+        }
+
+        return listingCopy;
+      })
+    );
+
+    res.json(listingsWithUrls);
   } catch (err) {
     console.error(err);
     res.status(500).send("Database error.");
@@ -314,6 +362,8 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
     }
 
     for (let image of image_urls) {
+      // image.url should be the S3 key (e.g., "listings/1234567890-filename.jpg")
+      // We'll store the S3 key, and generate view URLs when needed
       await pool.query(
         `INSERT INTO listing_images (listing_id, image_url, is_cover)
          VALUES ($1, $2, $3)`,
@@ -630,33 +680,158 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    // First, get the listing basic info
+    const listingResult = await pool.query(
       `SELECT 
         l.id, l.title, l.price, l.description, l.posted_at, l.user_id,
         u.first_name, u.last_name, u.username, u.college,
-        d.name as dorm_name,
-        COALESCE(array_remove(array_agg(DISTINCT c.name), NULL), ARRAY[]::text[]) as categories,
-        COALESCE(array_remove(array_agg(DISTINCT CASE WHEN li.image_url NOT LIKE 'blob:%' THEN json_build_object('id', li.id, 'image_url', li.image_url, 'is_cover', li.is_cover) END), NULL), ARRAY[]::json[]) as images
+        d.name as dorm_name
       FROM listings l
       LEFT JOIN users u ON l.user_id = u.id
       LEFT JOIN dorms d ON u.dorm_id = d.id
-      LEFT JOIN listing_categories lc ON l.id = lc.listing_id
-      LEFT JOIN categories c ON lc.category_id = c.id
-      LEFT JOIN listing_images li ON l.id = li.listing_id
-      WHERE l.id = $1
-      GROUP BY l.id, l.title, l.price, l.description, l.posted_at, l.user_id, u.first_name, u.last_name, u.username, u.college, d.name`,
+      WHERE l.id = $1`,
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (listingResult.rows.length === 0) {
       return res.status(404).send("Listing not found.");
     }
 
-    const listing = result.rows[0];
+    const listing = listingResult.rows[0];
+
+    // Get categories separately
+    const categoriesResult = await pool.query(
+      `SELECT c.name
+       FROM listing_categories lc
+       JOIN categories c ON lc.category_id = c.id
+       WHERE lc.listing_id = $1`,
+      [id]
+    );
+    listing.categories = categoriesResult.rows.map((row) => row.name);
+
+    // Get images separately
+    const imagesResult = await pool.query(
+      `SELECT id, image_url, is_cover
+       FROM listing_images
+       WHERE listing_id = $1
+       ORDER BY is_cover DESC, uploaded_at ASC`,
+      [id]
+    );
+
+    // Convert S3 keys to viewable URLs for images
+    listing.images = await Promise.all(
+      imagesResult.rows.map(async (img) => {
+        const imageUrl = img.image_url;
+
+        // Skip blob URLs (legacy)
+        if (!imageUrl || imageUrl.startsWith("blob:")) {
+          return null;
+        }
+
+        // If it's already a full URL (legacy), return as-is
+        if (imageUrl.startsWith("http")) {
+          return {
+            id: img.id,
+            image_url: imageUrl,
+            is_cover: img.is_cover,
+          };
+        }
+
+        // If it's an S3 key, generate presigned URL
+        try {
+          const viewURL = await generateViewURL(imageUrl);
+          return {
+            id: img.id,
+            image_url: viewURL,
+            is_cover: img.is_cover,
+          };
+        } catch (err) {
+          console.error("Error generating image URL:", err);
+          return {
+            id: img.id,
+            image_url: null,
+            is_cover: img.is_cover,
+          };
+        }
+      })
+    );
+
+    // Filter out null images
+    listing.images = listing.images.filter((img) => img !== null);
 
     res.json(listing);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching listing:", err);
     res.status(500).send("Database error.");
+  }
+});
+
+// S3 endpoints
+// Get presigned upload URL for a single image
+app.get("/s3/upload-url", jwtMiddleware, async (req, res) => {
+  try {
+    const { filename, contentType } = req.query;
+    if (!filename || !contentType) {
+      return res.status(400).json({
+        error: "Missing required query params: filename, contentType",
+      });
+    }
+    const { uploadURL, key } = await generateUploadURL(filename, contentType);
+    return res.json({ uploadURL, key });
+  } catch (err) {
+    console.error("/s3/upload-url error:", err);
+    return res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// Get multiple presigned upload URLs (for batch uploads)
+app.post("/s3/upload-urls", jwtMiddleware, async (req, res) => {
+  try {
+    const { files } = req.body; // Array of { filename, contentType }
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({
+        error: "Missing or invalid files array",
+      });
+    }
+    if (files.length > 6) {
+      return res.status(400).json({
+        error: "Maximum 6 files allowed",
+      });
+    }
+
+    const uploadUrls = await Promise.all(
+      files.map((file) =>
+        generateUploadURL(file.filename, file.contentType).then((result) => ({
+          uploadURL: result.uploadURL,
+          key: result.key,
+        }))
+      )
+    );
+
+    return res.json({ uploadUrls });
+  } catch (err) {
+    console.error("/s3/upload-urls error:", err);
+    const errorMessage =
+      err.message || "Failed to generate upload URLs. Check AWS configuration.";
+    return res.status(500).json({
+      error: errorMessage,
+      details: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+  }
+});
+
+app.get("/s3/test-view-url", jwtMiddleware, async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key) {
+      return res
+        .status(400)
+        .json({ error: "Missing required query param: key" });
+    }
+    const viewURL = await generateViewURL(key);
+    return res.json({ viewURL });
+  } catch (err) {
+    console.error("/s3/test-view-url error:", err);
+    return res.status(500).json({ error: "Failed to generate view URL" });
   }
 });

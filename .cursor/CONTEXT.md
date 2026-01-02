@@ -19,6 +19,7 @@
 - **Database:** PostgreSQL (local now, Supabase planned)
 - **Storage:** AWS S3 (image uploads)
 - **Email:** Gmail SMTP via NodeMailer (free email delivery)
+- **AI/ML:** OpenAI VLM/CLIP (planned for image analysis & auto-generated listings)
 - **Infra:** Docker (containers), CI/CD planned
 
 ---
@@ -93,6 +94,16 @@
 - [ ] Allow comments on listings
 - [ ] Likes/upvotes system
 
+### 🤖 AI-Powered Listing Generation (Future)
+
+- [ ] Integrate OpenAI VLM/CLIP for image analysis
+- [ ] Auto-generate listing titles from uploaded images
+- [ ] Auto-generate item descriptions from image analysis
+- [ ] Suggest optimal pricing based on item category and condition
+- [ ] Recommend relevant categories based on image content
+- [ ] FastAPI microservice for ML/image processing (ml-service folder)
+- [ ] User can accept/edit AI-generated suggestions before publishing
+
 ---
 
 ## 📦 Deployment & Infra
@@ -134,6 +145,7 @@
 - [ ] Optimize query joins (eager loading)
 - [ ] Introduce Redis (future) for sessions/caching
 - [ ] Use FastAPI microservices for ML/image features
+- [ ] OpenAI API integration for VLM/CLIP image analysis
 
 ---
 
@@ -398,6 +410,7 @@ Foreign-key constraints:
 - ✅ Profile picture upload interface (UI ready)
 - [ ] Show verification success message after valid entry
 - [ ] Create separate `/login` and `/signup` routes
+- [ ] Integrate OpenAI VLM/CLIP for AI-powered listing generation (title, description, categories)
 
 ---
 
@@ -674,7 +687,165 @@ Foreign-key constraints:
 - **Form State Management:** Controlled components, validation, error handling
 - **Authentication:** JWT-protected routes, user session management
 - **Responsive Design:** Mobile-first, Tailwind CSS styling
-- **Error Handling:** Validation errors, network errors, user feedback.
+- **Error Handling:** Validation errors, network errors, user feedback
+
+---
+
+## 🎨 **COMPLETED: Listing Details Page UI Improvements**
+
+### ✅ **What We Built (December 2024)**
+
+#### **UI Enhancements:**
+
+- **Image Size Optimization:** Listing images are now constrained on desktop devices (max-width: 28rem on large screens) while remaining full-width on mobile for better visual balance
+- **Mobile Header Cleanup:** The listing title is hidden in the top header on mobile resolutions (the main title is still shown in the content area)
+- **Centered Categories:** Category tags are now center-aligned under the "Categories" heading for improved visual hierarchy
+- **Cleaner Listing Info:** Removed listing ID from the listing info sidebar (only shows posted date)
+- **Improved Description Display:** Description text is now center-aligned with proper word-wrapping to prevent overflow on both mobile and desktop resolutions
+
+#### **Technical Implementation:**
+
+- **Responsive Image Container:** Added `max-w-md lg:max-w-lg` classes to constrain image size on larger screens
+- **Centered Layout:** Applied `text-center` and `justify-center` classes to categories and description sections
+- **Text Overflow Prevention:** Added `break-words overflow-wrap-anywhere max-w-full` classes to description for proper text wrapping
+- **Simplified Info Display:** Removed listing ID field from the listing info sidebar
+
+#### **User Experience:**
+
+- Better visual balance on desktop devices
+- Improved readability with centered text
+- Cleaner sidebar information display
+- Responsive design maintains mobile-first approach
+
+---
+
+## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**
+
+### 🎯 **Feature Overview**
+
+Integrate OpenAI's Vision Language Model (VLM) or CLIP to analyze uploaded listing images and automatically generate:
+
+- **Optimized listing titles** - Marketing-focused titles that help items sell better
+- **Detailed item descriptions** - Comprehensive descriptions based on visual analysis
+- **Category recommendations** - Suggest relevant categories based on image content
+- **Condition assessment** - Analyze item condition from images (optional)
+
+### 🏗️ **Architecture Plan**
+
+#### **Microservice Structure:**
+
+- **FastAPI Service** (`/ml-service` folder) - Dedicated microservice for ML/image processing
+- **OpenAI Integration** - Use OpenAI API (GPT-4 Vision or CLIP) for image analysis
+- **Express Backend** - Proxy requests to FastAPI service or call OpenAI directly
+- **Image Processing Flow:**
+  1. User uploads images in `CreateListing.jsx`
+  2. Images uploaded to S3 (or temporarily stored)
+  3. Frontend sends image URLs to backend
+  4. Backend calls OpenAI VLM/CLIP API with image(s)
+  5. AI analyzes image and returns structured data (title, description, categories)
+  6. Frontend pre-fills form fields with AI suggestions
+  7. User can edit/accept suggestions before submitting
+
+#### **API Endpoints (Planned):**
+
+**Express Backend:**
+
+- `POST /api/analyze-listing-image` - Send image to OpenAI, return suggestions
+  - Input: Image URL or base64 encoded image
+  - Output: `{ title: string, description: string, suggestedCategories: string[], confidence: number }`
+
+**FastAPI Microservice (Future):**
+
+- `POST /ml/analyze-image` - FastAPI endpoint for image analysis
+- `POST /ml/batch-analyze` - Analyze multiple images for one listing
+- `GET /ml/health` - Health check for ML service
+
+### 🔧 **Implementation Considerations**
+
+#### **OpenAI API Options:**
+
+1. **GPT-4 Vision (gpt-4-vision-preview)** - Best for detailed descriptions and marketing copy
+
+   - Can generate natural language titles and descriptions
+   - Understands context and can suggest selling points
+   - More expensive, slower response time
+
+2. **CLIP (OpenAI CLIP)** - Faster, cheaper for classification
+
+   - Better for category detection
+   - Less natural language generation
+   - Good for initial categorization
+
+3. **Hybrid Approach** - Use CLIP for categories, GPT-4 Vision for descriptions
+   - Cost-effective balance
+   - Fast category detection + quality descriptions
+
+#### **User Experience Flow:**
+
+1. User uploads images in listing creation form
+2. After images are uploaded, show "✨ AI Analysis" button
+3. User clicks button → Loading state → AI analyzes cover image (or all images)
+4. Form fields auto-populate with AI suggestions
+5. User can:
+   - Accept all suggestions
+   - Edit individual fields
+   - Regenerate suggestions
+   - Ignore and write manually
+
+#### **Technical Requirements:**
+
+- **Image Format:** Support JPEG, PNG, WebP
+- **Image Size:** Handle images up to 20MB (OpenAI limit)
+- **Rate Limiting:** Limit AI analysis requests per user (prevent abuse)
+- **Error Handling:** Graceful fallback if OpenAI API fails
+- **Caching:** Cache analysis results for same images (optional optimization)
+- **Cost Management:** Track API usage, implement usage limits if needed
+
+#### **Prompt Engineering:**
+
+- Design prompts that generate marketplace-optimized titles
+- Focus on selling points: brand, condition, features, style
+- Generate descriptions that highlight value and appeal to college students
+- Suggest categories that match marketplace taxonomy
+
+### 📋 **Implementation Checklist**
+
+- [ ] Set up OpenAI API key and environment variables
+- [ ] Create FastAPI microservice structure in `/ml-service`
+- [ ] Implement image analysis endpoint (Express or FastAPI)
+- [ ] Design prompt templates for title and description generation
+- [ ] Add "AI Analysis" button to `CreateListing.jsx`
+- [ ] Implement frontend state management for AI suggestions
+- [ ] Add loading states and error handling for AI requests
+- [ ] Add rate limiting for AI analysis endpoint
+- [ ] Test with various item types (electronics, furniture, clothing, etc.)
+- [ ] Optimize API calls (batch processing, caching)
+- [ ] Add user preference to enable/disable AI suggestions
+- [ ] Monitor API costs and usage
+
+### 🎨 **UI/UX Considerations**
+
+- **Visual Feedback:** Show AI analysis progress with animated indicator
+- **Suggestion Display:** Highlight AI-generated fields differently (e.g., with "✨ AI Suggestion" badge)
+- **Edit Capability:** Make it easy to edit AI suggestions
+- **Regenerate Option:** Allow users to request new suggestions if unsatisfied
+- **Opt-out:** Allow users to disable AI features entirely
+
+### 💰 **Cost Considerations**
+
+- **OpenAI Pricing:** GPT-4 Vision charges per image and tokens
+- **Optimization Strategies:**
+  - Only analyze cover image initially (not all 6 images)
+  - Cache results for similar images
+  - Offer AI analysis as premium feature (optional)
+  - Batch requests when possible
+
+### 🔗 **Integration Points**
+
+- **CreateListing.jsx:** Add AI analysis trigger after image upload
+- **Backend `/listings` POST:** Optionally validate AI-suggested categories
+- **S3 Integration:** Ensure images are accessible for OpenAI API
+- **FastAPI Service:** Future microservice for ML features (scalability)
 
 ---
 
