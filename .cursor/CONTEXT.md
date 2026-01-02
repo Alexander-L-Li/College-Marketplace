@@ -719,6 +719,14 @@ Foreign-key constraints:
 
 ---
 
+## ✍️ **COMPLETED: Uppercase Listing Titles (Create Listing)**
+
+### ✅ **What We Built**
+
+- **Forced uppercase titles**: The listing title input in `CreateListing.jsx` now automatically transforms all typed characters to uppercase in real time, so titles are saved/submitted in uppercase by default.
+
+---
+
 ## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**
 
 ### 🎯 **Feature Overview**

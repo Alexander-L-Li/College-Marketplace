@@ -398,7 +398,10 @@ function CreateListing() {
                 id="title"
                 value={formData.title}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    title: e.target.value.toUpperCase(),
+                  }))
                 }
                 placeholder="e.g., Black Patagonia Down Jacket"
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
