@@ -271,7 +271,9 @@ function ListingDetails() {
 
             {/* Description */}
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-black text-center">Description</h3>
+              <h3 className="text-lg font-semibold text-black text-center">
+                Description
+              </h3>
               <p className="text-gray-700 leading-relaxed text-center break-words overflow-wrap-anywhere max-w-full">
                 {listing.description}
               </p>
@@ -280,7 +282,9 @@ function ListingDetails() {
             {/* Categories */}
             {listing.categories && listing.categories.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-black text-center">Categories</h3>
+                <h3 className="text-lg font-semibold text-black text-center">
+                  Categories
+                </h3>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {listing.categories.map((category, index) => (
                     <span

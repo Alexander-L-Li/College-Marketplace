@@ -719,6 +719,32 @@ Foreign-key constraints:
 
 ---
 
+## ✍️ **COMPLETED: Uppercase Listing Titles (Create Listing)**
+
+### ✅ **What We Built**
+
+- **Forced uppercase titles**: The listing title input in `CreateListing.jsx` now automatically transforms all typed characters to uppercase in real time, so titles are saved/submitted in uppercase by default.
+
+---
+
+## 👥 **COMPLETED: View Other User Profiles by User ID**
+
+### ✅ **What We Built**
+
+- Users can now **view other users’ profiles** using a URL containing their unique user ID.
+- This supports the “View Profile” flow from listings (seller profiles).
+
+### 🔌 **API**
+
+- `GET /profile/:id` (JWT-protected): returns a **public profile** (no email) including `first_name`, `last_name`, `username`, `college`, `dorm_name`, `created_at`, `is_verified`.
+
+### 🖥️ **Frontend**
+
+- Added route: `/profile/:id`
+- Added page: `PublicProfile.jsx` (read-only profile view)
+
+---
+
 ## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**
 
 ### 🎯 **Feature Overview**

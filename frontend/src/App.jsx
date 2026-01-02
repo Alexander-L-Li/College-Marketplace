@@ -6,6 +6,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmailVerification from "./pages/EmailVerification";
 import Profile from "./pages/Profile";
+import PublicProfile from "./pages/PublicProfile";
 import CreateListing from "./pages/CreateListing";
 import ListingDetails from "./pages/ListingDetails";
 
@@ -20,6 +21,7 @@ function App() {
         <Route path="/verify" element={<EmailVerification />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:id" element={<PublicProfile />} />
         <Route path="/create-listing" element={<CreateListing />} />
         <Route path="/listing/:id" element={<ListingDetails />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

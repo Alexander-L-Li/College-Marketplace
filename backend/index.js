@@ -541,6 +541,30 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
   }
 });
 
+// Get a public user's profile data by ID (does NOT return email)
+app.get("/profile/:id", jwtMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.first_name, u.last_name, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name
+       FROM users u
+       LEFT JOIN dorms d ON u.dorm_id = d.id
+       WHERE u.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found.");
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching public profile:", err);
+    res.status(500).send("Database error.");
+  }
+});
+
 // Update current user's profile info
 app.patch("/profile", jwtMiddleware, async (req, res) => {
   const { first_name, last_name, username, dorm_id } = req.body;
