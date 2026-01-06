@@ -745,6 +745,37 @@ Foreign-key constraints:
 
 ---
 
+## 🖼️ **IN PROGRESS: Profile Pictures (S3-backed Avatars)**
+
+### 🎯 Goal
+
+Allow users to upload a profile picture that is persisted in S3 and shown on:
+
+- their own `Profile` page
+- other users’ `PublicProfile` page
+
+### Storage design
+
+- Use the **same S3 bucket** but a separate prefix for avatars:
+  - Listings: `listings/...`
+  - Profile pictures: `profiles/<userId>/...`
+
+### Backend
+
+- `GET /s3/profile-upload-url` (JWT): returns `{ uploadURL, key }` under `profiles/<userId>/...`
+- `PATCH /profile/avatar` (JWT): saves `users.profile_image_key` and returns `profile_image_url`
+- `GET /profile` and `GET /profile/:id`: include `profile_image_url` when available
+
+### DB
+
+- Add `users.profile_image_key TEXT` (see `.cursor/DB_MIGRATIONS.md`)
+
+### Docs
+
+- See `.cursor/PROFILE_PICTURES_S3.md`
+
+---
+
 ## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**
 
 ### 🎯 **Feature Overview**

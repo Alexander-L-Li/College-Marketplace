@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 function PublicProfile() {
   const navigate = useNavigate();
@@ -85,6 +85,7 @@ function PublicProfile() {
           <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
             <div className="flex flex-col items-center text-center space-y-3">
               <Avatar className="h-20 w-20">
+                <AvatarImage src={profile.profile_image_url || undefined} />
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
 

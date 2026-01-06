@@ -12,6 +12,7 @@ function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("success"); // "success" | "error"
   const [dorms, setDorms] = useState([]);
   const [profileImage, setProfileImage] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -64,6 +65,10 @@ function Profile() {
 
       const data = await res.json();
       setProfile(data);
+      // If backend returns a presigned URL, show it as the current avatar
+      if (data.profile_image_url) {
+        setProfileImage(data.profile_image_url);
+      }
       setEditForm({
         first_name: data.first_name,
         last_name: data.last_name,
@@ -117,19 +122,98 @@ function Profile() {
       const updatedProfile = await res.json();
       setProfile(updatedProfile);
       setIsEditing(false);
+      setMessageType("success");
       setMessage("Profile updated successfully!");
     } catch (err) {
       console.error("Error updating profile:", err);
+      setMessageType("error");
       setMessage(err.message || "Failed to update profile");
     }
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => setProfileImage(e.target.result);
-      reader.readAsDataURL(file);
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/");
+        return;
+      }
+
+      // Optional: show an immediate local preview while upload happens
+      const localPreview = URL.createObjectURL(file);
+      setProfileImage(localPreview);
+
+      // 1) Ask backend for a presigned S3 PUT URL
+      const qs = new URLSearchParams({
+        filename: file.name,
+        contentType: file.type,
+      });
+      const presignRes = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE_URL
+        }/s3/profile-upload-url?${qs.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!presignRes.ok) {
+        const t = await presignRes.text();
+        throw new Error(t || "Failed to get profile upload URL");
+      }
+      const { uploadURL, key } = await presignRes.json();
+
+      // 2) Upload directly to S3
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) {
+        throw new Error("Failed to upload profile picture to S3");
+      }
+
+      // 3) Persist the S3 key on the user record
+      const saveRes = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/profile/avatar`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ profile_image_key: key }),
+        }
+      );
+      if (!saveRes.ok) {
+        const t = await saveRes.text();
+        throw new Error(t || "Failed to save profile picture");
+      }
+
+      const saved = await saveRes.json();
+      setProfileImage(saved.profile_image_url || localPreview);
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              profile_image_url: saved.profile_image_url,
+              profile_image_key: saved.profile_image_key,
+            }
+          : prev
+      );
+      setMessageType("success");
+      setMessage("Profile picture updated!");
+    } catch (err) {
+      console.error("Profile image upload error:", err);
+      setMessageType("error");
+      setMessage(err.message || "Failed to upload profile picture");
+    } finally {
+      // reset file input so re-uploading the same file triggers onChange
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -422,10 +506,12 @@ function Profile() {
         {/* Message Display */}
         {message && (
           <Alert
-            variant={
-              message.includes("successfully") ? "default" : "destructive"
+            variant={messageType === "error" ? "destructive" : "default"}
+            className={
+              messageType === "error"
+                ? "text-center"
+                : "text-center border-green-200 bg-green-50 text-green-800"
             }
-            className="text-center"
           >
             <AlertDescription>{message}</AlertDescription>
           </Alert>

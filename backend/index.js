@@ -6,7 +6,12 @@ const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
 const { canRequestReset } = require("./utils/rateLimiter");
 const { v4: uuidv4 } = require("uuid");
-const { generateUploadURL, generateViewURL } = require("./config/s3");
+const {
+  generateUploadURL,
+  generateProfileUploadURL,
+  generateViewURL,
+  deleteImage,
+} = require("./config/s3");
 
 require("dotenv").config();
 
@@ -25,6 +30,27 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+let _usersHasProfileImageKeyColumn = null;
+async function usersHasProfileImageKeyColumn() {
+  if (_usersHasProfileImageKeyColumn !== null) {
+    return _usersHasProfileImageKeyColumn;
+  }
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_name = 'users' AND column_name = 'profile_image_key'
+       LIMIT 1`
+    );
+    _usersHasProfileImageKeyColumn = result.rowCount > 0;
+    return _usersHasProfileImageKeyColumn;
+  } catch (err) {
+    console.error("Error checking users.profile_image_key column:", err);
+    _usersHasProfileImageKeyColumn = false;
+    return false;
+  }
+}
 
 // JWT verification middleware
 function jwtMiddleware(req, res, next) {
@@ -522,8 +548,11 @@ app.post("/resend-verification", async (req, res) => {
 app.get("/profile", jwtMiddleware, async (req, res) => {
   const user_id = req.user.id;
   try {
+    const hasAvatar = await usersHasProfileImageKeyColumn();
+    const selectAvatar = hasAvatar ? ", u.profile_image_key" : "";
+
     const result = await pool.query(
-      `SELECT u.id, u.first_name, u.last_name, u.email, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name
+      `SELECT u.id, u.first_name, u.last_name, u.email, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name${selectAvatar}
        FROM users u 
        LEFT JOIN dorms d ON u.dorm_id = d.id 
        WHERE u.id = $1`,
@@ -534,7 +563,21 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
       return res.status(404).send("User not found.");
     }
 
-    res.json(result.rows[0]);
+    const profile = result.rows[0];
+    if (hasAvatar && profile.profile_image_key) {
+      try {
+        profile.profile_image_url = await generateViewURL(
+          profile.profile_image_key
+        );
+      } catch (err) {
+        console.error("Error generating profile image URL:", err);
+        profile.profile_image_url = null;
+      }
+    } else {
+      profile.profile_image_url = null;
+    }
+
+    res.json(profile);
   } catch (err) {
     console.error(err);
     res.status(500).send("Database error.");
@@ -546,8 +589,11 @@ app.get("/profile/:id", jwtMiddleware, async (req, res) => {
   const { id } = req.params;
 
   try {
+    const hasAvatar = await usersHasProfileImageKeyColumn();
+    const selectAvatar = hasAvatar ? ", u.profile_image_key" : "";
+
     const result = await pool.query(
-      `SELECT u.id, u.first_name, u.last_name, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name
+      `SELECT u.id, u.first_name, u.last_name, u.college, u.created_at, u.is_verified, u.username, d.name as dorm_name${selectAvatar}
        FROM users u
        LEFT JOIN dorms d ON u.dorm_id = d.id
        WHERE u.id = $1`,
@@ -558,10 +604,79 @@ app.get("/profile/:id", jwtMiddleware, async (req, res) => {
       return res.status(404).send("User not found.");
     }
 
-    res.json(result.rows[0]);
+    const profile = result.rows[0];
+    if (hasAvatar && profile.profile_image_key) {
+      try {
+        profile.profile_image_url = await generateViewURL(
+          profile.profile_image_key
+        );
+      } catch (err) {
+        console.error("Error generating public profile image URL:", err);
+        profile.profile_image_url = null;
+      }
+    } else {
+      profile.profile_image_url = null;
+    }
+
+    res.json(profile);
   } catch (err) {
     console.error("Error fetching public profile:", err);
     res.status(500).send("Database error.");
+  }
+});
+
+// Save current user's profile picture key (stored in S3 under profiles/<userId>/...)
+app.patch("/profile/avatar", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { profile_image_key } = req.body || {};
+
+  try {
+    const hasAvatar = await usersHasProfileImageKeyColumn();
+    if (!hasAvatar) {
+      return res
+        .status(500)
+        .send(
+          "Database missing users.profile_image_key column. Run the migration to add it."
+        );
+    }
+
+    if (
+      !profile_image_key ||
+      typeof profile_image_key !== "string" ||
+      !profile_image_key.startsWith(`profiles/${user_id}/`)
+    ) {
+      return res
+        .status(400)
+        .send(
+          "Invalid profile_image_key (must be under your profiles/<id>/ prefix)."
+        );
+    }
+
+    // Delete previous avatar if exists (best-effort)
+    const previous = await pool.query(
+      `SELECT profile_image_key FROM users WHERE id = $1`,
+      [user_id]
+    );
+    const oldKey = previous.rows[0]?.profile_image_key;
+
+    await pool.query(`UPDATE users SET profile_image_key = $1 WHERE id = $2`, [
+      profile_image_key,
+      user_id,
+    ]);
+
+    if (oldKey && oldKey !== profile_image_key) {
+      try {
+        await deleteImage(oldKey);
+      } catch (err) {
+        console.error("Failed to delete old profile image:", err);
+      }
+    }
+
+    const profile_image_url = await generateViewURL(profile_image_key);
+    return res.status(200).json({ profile_image_key, profile_image_url });
+  } catch (err) {
+    console.error("Error saving profile avatar:", err);
+    return res.status(500).send("Database error.");
   }
 });
 
@@ -805,6 +920,31 @@ app.get("/s3/upload-url", jwtMiddleware, async (req, res) => {
   } catch (err) {
     console.error("/s3/upload-url error:", err);
     return res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// Get presigned upload URL for a profile image (stored under profiles/<userId>/...)
+app.get("/s3/profile-upload-url", jwtMiddleware, async (req, res) => {
+  try {
+    const { filename, contentType } = req.query;
+    if (!filename || !contentType) {
+      return res.status(400).json({
+        error: "Missing required query params: filename, contentType",
+      });
+    }
+
+    const { uploadURL, key } = await generateProfileUploadURL(
+      req.user.id,
+      filename,
+      contentType
+    );
+    return res.json({ uploadURL, key });
+  } catch (err) {
+    console.error("/s3/profile-upload-url error:", err);
+    const errorMessage =
+      err.message ||
+      "Failed to generate upload URL for profile picture. Check AWS configuration.";
+    return res.status(500).json({ error: errorMessage });
   }
 });
 
