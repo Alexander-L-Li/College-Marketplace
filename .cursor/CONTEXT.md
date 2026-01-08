@@ -62,9 +62,9 @@
 - [ ] Add token expiration handling to `/verify-email`
 - [ ] Rate limit `/resend-verification`
 - [ ] Animate Confirm Password field (only shows when typing)
-- [ ] Split login & registration into `/login` and `/signup` pages
+- ✅ Split login & registration into `/login` and `/signup` pages
 - [ ] Support “Sign in with Google” & “Sign in with Apple”
-- [ ] Email verification success page
+- ✅ Email verification success page
 
 ### 💬 Messaging System (Lab 18)
 
@@ -680,6 +680,10 @@ Foreign-key constraints:
 - **Step 2:** Click "Proceed to Form" button
 - **Step 3:** Fill out item details (title, price, description, categories)
 - **Step 4:** Submit and redirect to home page
+
+#### **Small Wins (UX/Polish):**
+
+- ✅ **Removed hardcoded college** in listing creation: `CreateListing.jsx` now pulls the user’s `college` from `GET /profile` instead of using a hardcoded value.
 
 ### 🎯 **Technical Features:**
 

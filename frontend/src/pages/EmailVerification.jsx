@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -10,6 +10,7 @@ import {
 import { Loader2, Mail, CheckCircle, Clock } from "lucide-react";
 
 const EmailVerification = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email") || "";
   const user_id = searchParams.get("user_id") || "";
@@ -71,6 +72,8 @@ const EmailVerification = () => {
         setMessage("Email verified successfully! You can now log in.");
         setMessageType("success");
         setIsVerified(true);
+        // Send user to a dedicated success screen
+        setTimeout(() => navigate("/verify-success"), 600);
       } else if (response.status === 400) {
         setMessage("Invalid or expired code. Please try again.");
         setMessageType("error");
@@ -282,7 +285,7 @@ const EmailVerification = () => {
             </Alert>
 
             <Button asChild className="w-full font-semibold">
-              <Link to="/">Continue to Login</Link>
+              <Link to="/login">Continue to Login</Link>
             </Button>
           </div>
         )}
@@ -290,7 +293,7 @@ const EmailVerification = () => {
         {/* Back Link */}
         <div className="text-center">
           <Link
-            to="/"
+            to="/login"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 inline-flex items-center gap-1"
           >
             ← Back to Login

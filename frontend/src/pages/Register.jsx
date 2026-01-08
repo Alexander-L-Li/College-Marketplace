@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Register = () => {
@@ -130,12 +130,12 @@ const Register = () => {
         )}
 
         <div className="text-center">
-          <a
-            href="/"
+          <Link
+            to="/login"
             className="text-sm text-gray-600 hover:text-black underline underline-offset-2"
           >
             Already have an account? Log in
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ function CreateListing() {
   const navigate = useNavigate();
   const [images, setImages] = useState([]);
   const [dragActive, setDragActive] = useState(false);
+  const [userCollege, setUserCollege] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     price: "",
@@ -23,7 +24,7 @@ function CreateListing() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      navigate("/");
+      navigate("/login");
       return;
     }
 
@@ -36,18 +37,19 @@ function CreateListing() {
       }
     } catch (e) {
       localStorage.removeItem("token");
-      navigate("/");
+      navigate("/login");
       return;
     }
 
     // Fetch categories from backend
     fetchCategories();
+    fetchProfileCollege();
   }, [navigate]);
 
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:3001/categories", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/categories`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -59,6 +61,21 @@ function CreateListing() {
       }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
+    }
+  };
+
+  const fetchProfileCollege = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserCollege(data.college || "");
+      }
+    } catch (err) {
+      console.error("Failed to fetch profile college:", err);
     }
   };
 
@@ -149,7 +166,7 @@ function CreateListing() {
       }));
 
       const uploadUrlsResponse = await fetch(
-        "http://localhost:3001/s3/upload-urls",
+        `${import.meta.env.VITE_API_BASE_URL}/s3/upload-urls`,
         {
           method: "POST",
           headers: {
@@ -208,13 +225,17 @@ function CreateListing() {
       setError("Please fill in all required fields");
       return;
     }
+    if (!userCollege) {
+      setError("Unable to determine your college. Please refresh and try again.");
+      return;
+    }
 
     setIsSubmitting(true);
     setError("");
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:3001/listings", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/listings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -225,7 +246,7 @@ function CreateListing() {
           price: parseFloat(formData.price),
           description: formData.description,
           categories: formData.categories,
-          college: "MIT", // TODO: Get from user profile
+          college: userCollege,
           image_urls: uploadedImageKeys.map((img) => ({
             url: img.key, // S3 key (e.g., "listings/1234567890-filename.jpg")
             is_cover: img.is_cover,
