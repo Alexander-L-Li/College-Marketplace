@@ -68,11 +68,11 @@
 
 ### 💬 Messaging System (Lab 18)
 
-- [ ] Design conversations table schema
-- [ ] Implement inbox view (efficient querying)
-- [ ] Build message thread view
-- [ ] Add new message API
-- [ ] Add read receipts
+- ✅ Design conversations + messages table schema
+- ✅ Implement inbox view (efficient querying)
+- ✅ Build message thread view
+- ✅ Add new message API
+- [ ] Add read receipts / unread counts
 
 ### 🖼️ Listings Page (Home Feed)
 
@@ -777,6 +777,39 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 ### Docs
 
 - See `.cursor/PROFILE_PICTURES_S3.md`
+
+---
+
+## 💬 **COMPLETED: Messaging (Contact Seller → Inbox/Thread)**
+
+### ✅ What we built
+
+- Listing page “**Contact Seller**” now opens a real conversation thread.
+- Basic inbox + thread UI (send/receive messages).
+
+### 🧱 DB
+
+- Added schema doc: `.cursor/MESSAGING_DB.md`
+- Tables:
+  - `conversations` (listing-scoped buyer/seller thread)
+  - `messages` (message rows per conversation)
+
+### 🔌 Backend API (JWT-protected)
+
+- `POST /conversations` — create or fetch a conversation for `{ listing_id }`
+- `GET /conversations` — inbox list (with listing title + cover + other user + last message)
+- `GET /conversations/:id/messages` — fetch thread
+- `POST /conversations/:id/messages` — send message
+
+### 🖥️ Frontend
+
+- Routes:
+  - `/inbox` — inbox list
+  - `/inbox/:id` — conversation thread
+- Files:
+  - `frontend/src/pages/Inbox.jsx`
+  - `frontend/src/pages/Conversation.jsx`
+  - `frontend/src/pages/ListingDetails.jsx` (wired Contact Seller)
 
 ---
 

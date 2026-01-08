@@ -10,6 +10,8 @@ import Profile from "./pages/Profile";
 import PublicProfile from "./pages/PublicProfile";
 import CreateListing from "./pages/CreateListing";
 import ListingDetails from "./pages/ListingDetails";
+import Inbox from "./pages/Inbox";
+import Conversation from "./pages/Conversation";
 
 import "./App.css";
 
@@ -29,6 +31,8 @@ function App() {
         <Route path="/profile/:id" element={<PublicProfile />} />
         <Route path="/create-listing" element={<CreateListing />} />
         <Route path="/listing/:id" element={<ListingDetails />} />
+        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/inbox/:id" element={<Conversation />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>

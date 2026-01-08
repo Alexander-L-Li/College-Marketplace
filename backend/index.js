@@ -999,3 +999,229 @@ app.get("/s3/test-view-url", jwtMiddleware, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate view URL" });
   }
 });
+
+// -----------------------------
+// Messaging (Conversations + Messages)
+// -----------------------------
+
+// Create (or fetch) a conversation for a listing between current user (buyer) and the listing owner (seller)
+app.post("/conversations", jwtMiddleware, async (req, res) => {
+  const buyer_id = req.user.id;
+  const { listing_id } = req.body || {};
+
+  if (!listing_id) {
+    return res.status(400).json({ error: "listing_id is required" });
+  }
+
+  try {
+    const listingRes = await pool.query(
+      `SELECT id, title, user_id FROM listings WHERE id = $1`,
+      [listing_id]
+    );
+    if (listingRes.rows.length === 0) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    const listing = listingRes.rows[0];
+    const seller_id = listing.user_id;
+
+    if (seller_id === buyer_id) {
+      return res.status(400).json({ error: "You cannot message yourself." });
+    }
+
+    // Create conversation (or get existing)
+    const convoRes = await pool.query(
+      `INSERT INTO conversations (listing_id, buyer_id, seller_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (listing_id, buyer_id, seller_id)
+       DO UPDATE SET listing_id = EXCLUDED.listing_id
+       RETURNING id, listing_id, buyer_id, seller_id, created_at`,
+      [listing_id, buyer_id, seller_id]
+    );
+
+    return res.status(200).json({
+      conversation: {
+        ...convoRes.rows[0],
+        listing_title: listing.title,
+      },
+    });
+  } catch (err) {
+    console.error("POST /conversations error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// List conversations for current user (inbox)
+app.get("/conversations", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.listing_id,
+        l.title AS listing_title,
+        (
+          SELECT image_url
+          FROM listing_images
+          WHERE listing_id = l.id AND is_cover = true
+          LIMIT 1
+        ) AS listing_cover_key,
+        c.buyer_id,
+        c.seller_id,
+        CASE WHEN c.buyer_id = $1 THEN c.seller_id ELSE c.buyer_id END AS other_user_id,
+        u.username AS other_username,
+        u.first_name AS other_first_name,
+        u.last_name AS other_last_name,
+        u.profile_image_key AS other_profile_image_key,
+        lm.body AS last_message_body,
+        lm.created_at AS last_message_at
+      FROM conversations c
+      JOIN listings l ON l.id = c.listing_id
+      JOIN users u ON u.id = CASE WHEN c.buyer_id = $1 THEN c.seller_id ELSE c.buyer_id END
+      LEFT JOIN LATERAL (
+        SELECT body, created_at
+        FROM messages
+        WHERE conversation_id = c.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) lm ON true
+      WHERE c.buyer_id = $1 OR c.seller_id = $1
+      ORDER BY lm.created_at DESC NULLS LAST, c.created_at DESC
+      `,
+      [user_id]
+    );
+
+    const convos = await Promise.all(
+      result.rows.map(async (row) => {
+        const convo = { ...row };
+
+        // listing cover
+        convo.listing_cover_url = null;
+        if (convo.listing_cover_key && !convo.listing_cover_key.startsWith("http")) {
+          try {
+            convo.listing_cover_url = await generateViewURL(convo.listing_cover_key);
+          } catch (err) {
+            console.error("Error generating listing cover URL:", err);
+          }
+        } else if (convo.listing_cover_key) {
+          convo.listing_cover_url = convo.listing_cover_key;
+        }
+
+        // other user's profile image
+        convo.other_profile_image_url = null;
+        if (convo.other_profile_image_key) {
+          try {
+            convo.other_profile_image_url = await generateViewURL(
+              convo.other_profile_image_key
+            );
+          } catch (err) {
+            console.error("Error generating other profile image URL:", err);
+          }
+        }
+
+        // cleanup raw keys
+        delete convo.listing_cover_key;
+
+        return convo;
+      })
+    );
+
+    return res.json({ conversations: convos });
+  } catch (err) {
+    console.error("GET /conversations error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Get messages for a conversation (thread view)
+app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { id: conversation_id } = req.params;
+
+  try {
+    const convoRes = await pool.query(
+      `SELECT id, listing_id, buyer_id, seller_id
+       FROM conversations
+       WHERE id = $1`,
+      [conversation_id]
+    );
+    if (convoRes.rows.length === 0) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+    const convo = convoRes.rows[0];
+    if (convo.buyer_id !== user_id && convo.seller_id !== user_id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const listingRes = await pool.query(
+      `SELECT id, title FROM listings WHERE id = $1`,
+      [convo.listing_id]
+    );
+    const listing_title = listingRes.rows[0]?.title || "";
+
+    const msgsRes = await pool.query(
+      `SELECT m.id, m.sender_id, m.body, m.created_at,
+              u.username, u.first_name, u.last_name
+       FROM messages m
+       JOIN users u ON u.id = m.sender_id
+       WHERE m.conversation_id = $1
+       ORDER BY m.created_at ASC`,
+      [conversation_id]
+    );
+
+    return res.json({
+      conversation: {
+        id: convo.id,
+        listing_id: convo.listing_id,
+        listing_title,
+        buyer_id: convo.buyer_id,
+        seller_id: convo.seller_id,
+      },
+      messages: msgsRes.rows,
+    });
+  } catch (err) {
+    console.error("GET /conversations/:id/messages error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Send a message in a conversation
+app.post("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
+  const sender_id = req.user.id;
+  const { id: conversation_id } = req.params;
+  const { body } = req.body || {};
+
+  if (!body || typeof body !== "string" || body.trim().length === 0) {
+    return res.status(400).json({ error: "Message body is required." });
+  }
+
+  try {
+    const convoRes = await pool.query(
+      `SELECT id, buyer_id, seller_id
+       FROM conversations
+       WHERE id = $1`,
+      [conversation_id]
+    );
+    if (convoRes.rows.length === 0) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+    const convo = convoRes.rows[0];
+    if (convo.buyer_id !== sender_id && convo.seller_id !== sender_id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const msgRes = await pool.query(
+      `INSERT INTO messages (conversation_id, sender_id, body)
+       VALUES ($1, $2, $3)
+       RETURNING id, conversation_id, sender_id, body, created_at`,
+      [conversation_id, sender_id, body.trim()]
+    );
+
+    return res.status(201).json({ message: msgRes.rows[0] });
+  } catch (err) {
+    console.error("POST /conversations/:id/messages error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});

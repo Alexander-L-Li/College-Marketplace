@@ -6,6 +6,7 @@ function ListingDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [listing, setListing] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,11 +20,15 @@ function ListingDetails() {
     }
 
     try {
-      const { exp } = jwtDecode(token);
+      const decoded = jwtDecode(token);
+      const { exp } = decoded;
       if (Date.now() >= exp * 1000) {
         localStorage.removeItem("token");
         navigate("/");
         return;
+      }
+      if (decoded?.id) {
+        setCurrentUserId(decoded.id);
       }
     } catch (e) {
       localStorage.removeItem("token");
@@ -54,6 +59,41 @@ function ListingDetails() {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleContactSeller = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/conversations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ listing_id: id }),
+      });
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Failed to open conversation");
+      }
+
+      const data = await res.json();
+      const convoId = data?.conversation?.id;
+      if (!convoId) {
+        throw new Error("Conversation not created.");
+      }
+
+      navigate(`/inbox/${convoId}`);
+    } catch (err) {
+      console.error("Contact seller error:", err);
+      setError(err.message || "Failed to contact seller");
     }
   };
 
@@ -337,16 +377,16 @@ function ListingDetails() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              <button
-                onClick={() => {
-                  /* TODO: Implement contact seller */
-                }}
-                className="w-full bg-black text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                Contact Seller
-              </button>
+              {listing.user_id !== currentUserId && (
+                <button
+                  onClick={handleContactSeller}
+                  className="w-full bg-black text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                >
+                  Contact Seller
+                </button>
+              )}
 
-              {listing.user_id === /* TODO: Get current user ID */ null && (
+              {listing.user_id === currentUserId && (
                 <button
                   onClick={() => {
                     /* TODO: Implement edit listing */
