@@ -811,6 +811,12 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
   - `frontend/src/pages/Conversation.jsx`
   - `frontend/src/pages/ListingDetails.jsx` (wired Contact Seller)
 
+### 🎨 UX updates
+
+- **Navigation**: Home header now uses a **hamburger dropdown** for multiple destinations (Profile + Inbox + Logout), instead of a single profile icon.
+- **Inbox organization**: Inbox is **grouped by listing**, so sellers can manage multiple buyers per listing in one place.
+- **Chat UI**: Conversation thread is styled closer to **iOS/iMessage** (left/right bubbles, timestamps, iOS-like background + composer).
+
 ---
 
 ## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**

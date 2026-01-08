@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { Menu, User, Inbox as InboxIcon, LogOut } from "lucide-react";
 
 function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name_asc");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const filteredListings = listings
     .filter((listing) =>
@@ -90,8 +93,20 @@ function Home() {
   async function handleLogout(e) {
     e.preventDefault();
     localStorage.removeItem("token");
-    navigate("/");
+    navigate("/login");
   }
+
+  // Close menu on outside click
+  useEffect(() => {
+    function onDocMouseDown(e) {
+      if (!isMenuOpen) return;
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [isMenuOpen]);
 
   return (
     <div className="min-h-screen bg-white px-4 py-6">
@@ -102,27 +117,51 @@ function Home() {
             <h1 className="text-2xl font-bold text-black mb-2">Dorm Space</h1>
           </div>
 
-          {/* Profile Icon - Top Right */}
-          <button
-            onClick={() => navigate("/profile")}
-            className="absolute top-0 right-0 p-2 text-gray-600 hover:text-black transition-colors"
-            aria-label="Profile"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          {/* Hamburger Menu - Top Right */}
+          <div ref={menuRef} className="absolute top-0 right-0">
+            <button
+              onClick={() => setIsMenuOpen((v) => !v)}
+              className="p-2 text-gray-600 hover:text-black transition-colors"
+              aria-label="Menu"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-          </button>
+              <Menu className="w-6 h-6" />
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/profile");
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-black hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/inbox");
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-black hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <InboxIcon className="w-4 h-4" />
+                  Inbox
+                </button>
+                <button
+                  onClick={(e) => {
+                    setIsMenuOpen(false);
+                    handleLogout(e);
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search Bar */}

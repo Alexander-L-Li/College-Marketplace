@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
@@ -7,6 +7,8 @@ export default function Conversation() {
   const { id } = useParams(); // conversation id
 
   const token = useMemo(() => localStorage.getItem("token"), []);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const bottomRef = useRef(null);
 
   const [thread, setThread] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -22,12 +24,14 @@ export default function Conversation() {
     }
 
     try {
-      const { exp } = jwtDecode(token);
+      const decoded = jwtDecode(token);
+      const { exp } = decoded;
       if (Date.now() >= exp * 1000) {
         localStorage.removeItem("token");
         navigate("/login");
         return;
       }
+      if (decoded?.id) setCurrentUserId(decoded.id);
     } catch {
       localStorage.removeItem("token");
       navigate("/login");
@@ -56,6 +60,11 @@ export default function Conversation() {
 
     fetchThread();
   }, [id, navigate, token]);
+
+  useEffect(() => {
+    // Scroll to bottom on load and when messages change
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   async function handleSend() {
     if (!draft.trim()) return;
@@ -91,18 +100,19 @@ export default function Conversation() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="px-4 py-4 border-b border-gray-200">
+    <div className="min-h-screen bg-[#F2F2F7] flex flex-col">
+      {/* iOS-style nav bar */}
+      <div className="px-4 py-3 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <button
             onClick={() => navigate("/inbox")}
-            className="text-gray-600 hover:text-black transition-colors"
+            className="text-blue-600 hover:text-blue-700 transition-colors text-sm font-medium"
           >
             ← Inbox
           </button>
           <div className="text-center">
-            <div className="text-sm text-gray-600">Listing</div>
-            <div className="font-semibold text-black">
+            <div className="text-xs text-gray-500">Listing</div>
+            <div className="font-semibold text-black text-sm">
               {thread?.listing_title || "Conversation"}
             </div>
           </div>
@@ -110,8 +120,9 @@ export default function Conversation() {
         </div>
       </div>
 
+      {/* Messages */}
       <div className="flex-1 px-4 py-4 overflow-y-auto">
-        <div className="max-w-2xl mx-auto space-y-3">
+        <div className="max-w-2xl mx-auto space-y-2">
           {isLoading ? (
             <div className="text-center text-gray-600">Loading...</div>
           ) : error ? (
@@ -123,33 +134,59 @@ export default function Conversation() {
               No messages yet. Send the first one.
             </div>
           ) : (
-            messages.map((m) => (
-              <div key={m.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <div className="text-xs text-gray-500 flex justify-between gap-3">
-                  <span>
-                    {m.first_name} {m.last_name} (@{m.username})
-                  </span>
-                  <span className="whitespace-nowrap">
-                    {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
-                  </span>
-                </div>
-                <div className="text-sm text-black mt-1 whitespace-pre-wrap break-words">
-                  {m.body}
-                </div>
-              </div>
-            ))
+            <>
+              {messages.map((m) => {
+                const isMine = currentUserId && m.sender_id === currentUserId;
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex ${
+                      isMine ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div className="max-w-[78%]">
+                      <div
+                        className={`px-3 py-2 text-sm shadow-sm ${
+                          isMine
+                            ? "bg-[#007AFF] text-white rounded-2xl rounded-br-md"
+                            : "bg-white text-black rounded-2xl rounded-bl-md border border-gray-200"
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap break-words">
+                          {m.body}
+                        </div>
+                      </div>
+                      <div
+                        className={`mt-1 text-[11px] text-gray-500 ${
+                          isMine ? "text-right" : "text-left"
+                        }`}
+                      >
+                        {m.created_at
+                          ? new Date(m.created_at).toLocaleTimeString([], {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
+            </>
           )}
         </div>
       </div>
 
-      <div className="px-4 py-4 border-t border-gray-200">
+      {/* Composer */}
+      <div className="px-4 py-3 border-t border-gray-200 bg-white">
         <div className="max-w-2xl mx-auto flex gap-2">
           <input
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Write a message..."
-            className="flex-1 px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black"
+            className="flex-1 px-4 py-3 bg-[#F2F2F7] border border-gray-200 rounded-full text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSend();
             }}
@@ -157,7 +194,7 @@ export default function Conversation() {
           <button
             onClick={handleSend}
             disabled={isSending || !draft.trim()}
-            className="bg-black text-white px-4 py-3 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="bg-[#007AFF] text-white px-5 py-3 rounded-full font-semibold hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSending ? "..." : "Send"}
           </button>
@@ -166,5 +203,3 @@ export default function Conversation() {
     </div>
   );
 }
-
-
