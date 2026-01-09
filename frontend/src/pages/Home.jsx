@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
-import { Menu, User, Inbox as InboxIcon, LogOut } from "lucide-react";
+import { Menu, User, Inbox as InboxIcon, LogOut, Tag } from "lucide-react";
+import { authFetch, logout } from "@/lib/auth";
 
 function Home() {
   const navigate = useNavigate();
@@ -10,90 +10,54 @@ function Home() {
   const [sortBy, setSortBy] = useState("name_asc");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
-
-  const filteredListings = listings
-    .filter((listing) =>
-      listing.title.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === "name_asc") return a.title.localeCompare(b.title);
-      if (sortBy === "name_desc") return b.title.localeCompare(a.title);
-      if (sortBy === "price_asc") return a.price - b.price;
-      if (sortBy === "price_desc") return b.price - a.price;
-      if (sortBy === "latest")
-        return new Date(b.posted_at) - new Date(a.posted_at);
-      if (sortBy === "oldest")
-        return new Date(a.posted_at) - new Date(b.posted_at);
-      return 0;
-    });
+  const apiBase = import.meta.env.VITE_API_BASE_URL;
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const searchDebounceRef = useRef(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    console.log(
-      "Home.jsx - Token retrieved from localStorage:",
-      token ? "Token exists" : "No token"
-    );
+    const controller = new AbortController();
 
-    if (!token) {
-      console.log("No token found, redirecting to login");
-      navigate("/");
-      return;
+    // debounce search to avoid firing on every keystroke
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
     }
 
-    try {
-      const { exp } = jwtDecode(token);
-      console.log("Token expiration check:", {
-        exp,
-        currentTime: Date.now(),
-        isExpired: Date.now() >= exp * 1000,
-      });
-      if (Date.now() >= exp * 1000) {
-        console.log("Token expired, redirecting to login");
-        localStorage.removeItem("token");
-        navigate("/");
-        return;
-      }
-    } catch (e) {
-      console.log("Token decode error:", e);
-      localStorage.removeItem("token");
-      navigate("/");
-      return;
-    }
+    searchDebounceRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      setError("");
 
-    async function fetchListings() {
       try {
-        console.log(
-          "Making request to /listings with token:",
-          token ? "Token exists" : "No token"
-        );
-        const res = await fetch("http://localhost:3001/listings", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const params = new URLSearchParams();
+        if (searchQuery.trim()) params.set("search", searchQuery.trim());
+        if (sortBy) params.set("sort", sortBy);
+
+        const url = `${apiBase}/listings?${params.toString()}`;
+        const res = await authFetch(navigate, url, {
+          signal: controller.signal,
         });
 
-        console.log("Response status:", res.status);
         if (!res.ok) {
-          const errorText = await res.text();
-          console.log("Error response:", errorText);
-          throw new Error(errorText || "Failed to fetch listings");
+          const t = await res.text();
+          throw new Error(t || "Failed to fetch listings");
         }
 
         const data = await res.json();
-        console.log("Listings fetched successfully:", data.length, "items");
         setListings(data);
       } catch (err) {
-        console.error("fetchListings error:", err);
+        if (err.name === "AbortError") return;
+        setError(err.message || "Failed to fetch listings");
+      } finally {
+        setIsLoading(false);
       }
-    }
+    }, 250);
 
-    fetchListings();
-  }, [navigate]);
+    return () => controller.abort();
+  }, [apiBase, navigate, searchQuery, sortBy]);
 
   async function handleLogout(e) {
     e.preventDefault();
-    localStorage.removeItem("token");
-    navigate("/login");
+    logout(navigate);
   }
 
   // Close menu on outside click
@@ -150,6 +114,16 @@ function Home() {
                   Inbox
                 </button>
                 <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/my-listings");
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-black hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Tag className="w-4 h-4" />
+                  My Listings
+                </button>
+                <button
                   onClick={(e) => {
                     setIsMenuOpen(false);
                     handleLogout(e);
@@ -204,43 +178,51 @@ function Home() {
       </div>
       {/* Listings */}
       <div className="space-y-4">
-        {filteredListings.map((listing) => (
-          <div
-            key={listing.id}
-            onClick={() => navigate(`/listing/${listing.id}`)}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center space-x-4">
-              {/* Cover Image */}
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {listing.cover_image_url ? (
-                  <img
-                    src={listing.cover_image_url}
-                    alt={listing.title}
-                    className="object-cover w-full h-full"
-                  />
-                ) : (
-                  <span className="text-gray-400 text-xs">No Image</span>
-                )}
-              </div>
+        {isLoading ? (
+          <div className="text-center text-gray-600 py-8">Loading...</div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        ) : (
+          listings.map((listing) => (
+            <div
+              key={listing.id}
+              onClick={() => navigate(`/listing/${listing.id}`)}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center space-x-4">
+                {/* Cover Image */}
+                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                  {listing.cover_image_url ? (
+                    <img
+                      src={listing.cover_image_url}
+                      alt={listing.title}
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-xs">No Image</span>
+                  )}
+                </div>
 
-              {/* Item Info */}
-              <div className="flex-1">
-                <h3 className="font-bold text-black text-base">
-                  {listing.title}
-                </h3>
-                <p className="text-lg font-semibold text-black">
-                  ${listing.price}
-                </p>
-                <p className="text-sm text-gray-600">
-                  by {listing.first_name} {listing.last_name} (@
-                  {listing.username})
-                  {listing.dorm_name && ` • ${listing.dorm_name}`}
-                </p>
+                {/* Item Info */}
+                <div className="flex-1">
+                  <h3 className="font-bold text-black text-base">
+                    {listing.title}
+                  </h3>
+                  <p className="text-lg font-semibold text-black">
+                    ${listing.price}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    by {listing.first_name} {listing.last_name} (@
+                    {listing.username})
+                    {listing.dorm_name && ` • ${listing.dorm_name}`}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

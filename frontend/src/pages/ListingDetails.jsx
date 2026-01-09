@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { authFetch, logout } from "@/lib/auth";
 
 function ListingDetails() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ function ListingDetails() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      navigate("/");
+      navigate("/login");
       return;
     }
 
@@ -23,16 +24,14 @@ function ListingDetails() {
       const decoded = jwtDecode(token);
       const { exp } = decoded;
       if (Date.now() >= exp * 1000) {
-        localStorage.removeItem("token");
-        navigate("/");
+        logout(navigate);
         return;
       }
       if (decoded?.id) {
         setCurrentUserId(decoded.id);
       }
     } catch (e) {
-      localStorage.removeItem("token");
-      navigate("/");
+      logout(navigate);
       return;
     }
 
@@ -41,12 +40,10 @@ function ListingDetails() {
 
   const fetchListing = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:3001/listing/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/listing/${id}`
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -70,14 +67,17 @@ function ListingDetails() {
         return;
       }
 
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/conversations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ listing_id: id }),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/conversations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ listing_id: id }),
+        }
+      );
 
       if (!res.ok) {
         const t = await res.text();

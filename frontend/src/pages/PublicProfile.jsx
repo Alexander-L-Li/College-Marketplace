@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { authFetch, logout } from "@/lib/auth";
 
 function PublicProfile() {
   const navigate = useNavigate();
@@ -15,27 +16,11 @@ function PublicProfile() {
   useEffect(() => {
     async function fetchPublicProfile() {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          navigate("/");
-          return;
-        }
-
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/profile/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const res = await authFetch(
+          navigate,
+          `${import.meta.env.VITE_API_BASE_URL}/profile/${id}`
         );
-
         if (!res.ok) {
-          if (res.status === 401) {
-            localStorage.removeItem("token");
-            navigate("/");
-            return;
-          }
           const text = await res.text();
           throw new Error(text || "Failed to load profile");
         }

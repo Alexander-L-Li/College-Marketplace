@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
+import { authFetch, logout, requireAuth } from "@/lib/auth";
 
 function CreateListing() {
   const navigate = useNavigate();
@@ -22,24 +22,8 @@ function CreateListing() {
 
   // Check authentication on component mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
-    try {
-      const { exp } = jwtDecode(token);
-      if (Date.now() >= exp * 1000) {
-        localStorage.removeItem("token");
-        navigate("/");
-        return;
-      }
-    } catch (e) {
-      localStorage.removeItem("token");
-      navigate("/login");
-      return;
-    }
+    const token = requireAuth(navigate);
+    if (!token) return;
 
     // Fetch categories from backend
     fetchCategories();
@@ -48,12 +32,10 @@ function CreateListing() {
 
   const fetchCategories = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/categories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/categories`
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -66,10 +48,10 @@ function CreateListing() {
 
   const fetchProfileCollege = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/profile`
+      );
       if (res.ok) {
         const data = await res.json();
         setUserCollege(data.college || "");
@@ -157,7 +139,8 @@ function CreateListing() {
     setError("");
 
     try {
-      const token = localStorage.getItem("token");
+      const token = requireAuth(navigate);
+      if (!token) return;
 
       // Step 1: Get presigned upload URLs from backend
       const filesData = images.map((img) => ({
@@ -165,13 +148,13 @@ function CreateListing() {
         contentType: img.file.type,
       }));
 
-      const uploadUrlsResponse = await fetch(
+      const uploadUrlsResponse = await authFetch(
+        navigate,
         `${import.meta.env.VITE_API_BASE_URL}/s3/upload-urls`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ files: filesData }),
         }
@@ -226,7 +209,9 @@ function CreateListing() {
       return;
     }
     if (!userCollege) {
-      setError("Unable to determine your college. Please refresh and try again.");
+      setError(
+        "Unable to determine your college. Please refresh and try again."
+      );
       return;
     }
 
@@ -234,25 +219,27 @@ function CreateListing() {
     setError("");
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/listings`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          price: parseFloat(formData.price),
-          description: formData.description,
-          categories: formData.categories,
-          college: userCollege,
-          image_urls: uploadedImageKeys.map((img) => ({
-            url: img.key, // S3 key (e.g., "listings/1234567890-filename.jpg")
-            is_cover: img.is_cover,
-          })),
-        }),
-      });
+      const response = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/listings`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: formData.title,
+            price: parseFloat(formData.price),
+            description: formData.description,
+            categories: formData.categories,
+            college: userCollege,
+            image_urls: uploadedImageKeys.map((img) => ({
+              url: img.key, // S3 key (e.g., "listings/1234567890-filename.jpg")
+              is_cover: img.is_cover,
+            })),
+          }),
+        }
+      );
 
       if (response.ok) {
         // Success! Redirect to home page

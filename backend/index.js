@@ -52,6 +52,25 @@ async function usersHasProfileImageKeyColumn() {
   }
 }
 
+let _listingsHasIsSoldColumn = null;
+async function listingsHasIsSoldColumn() {
+  if (_listingsHasIsSoldColumn !== null) return _listingsHasIsSoldColumn;
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_name = 'listings' AND column_name = 'is_sold'
+       LIMIT 1`
+    );
+    _listingsHasIsSoldColumn = result.rowCount > 0;
+    return _listingsHasIsSoldColumn;
+  } catch (err) {
+    console.error("Error checking listings.is_sold column:", err);
+    _listingsHasIsSoldColumn = false;
+    return false;
+  }
+}
+
 // JWT verification middleware
 function jwtMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -258,6 +277,9 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
   const orderBy = sortOptions[sort] || "l.posted_at DESC"; // default fallback
 
   try {
+    const hasIsSold = await listingsHasIsSoldColumn();
+    const selectIsSold = hasIsSold ? ", l.is_sold" : ", false as is_sold";
+
     let values = [];
     let whereClause = "";
 
@@ -267,7 +289,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     }
 
     const listingsQuery = `
-    SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at, 
+    SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at${selectIsSold}, 
     u.first_name, u.last_name, u.username, d.name as dorm_name,
     (
     SELECT image_url 
@@ -339,6 +361,190 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send("Database error.");
+  }
+});
+
+// Get current user's listings (for My Listings management)
+app.get("/my-listings", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  try {
+    const hasIsSold = await listingsHasIsSoldColumn();
+    const selectIsSold = hasIsSold ? "l.is_sold" : "false as is_sold";
+
+    const q = `
+      SELECT
+        l.id, l.title, l.price, l.description, l.college, l.posted_at,
+        ${selectIsSold},
+        (
+          SELECT image_url
+          FROM listing_images
+          WHERE listing_id = l.id AND is_cover = true
+          LIMIT 1
+        ) AS cover_image_url,
+        COALESCE(array_remove(array_agg(DISTINCT c.name), NULL), ARRAY[]::text[]) as categories
+      FROM listings l
+      LEFT JOIN listing_categories lc ON l.id = lc.listing_id
+      LEFT JOIN categories c ON lc.category_id = c.id
+      WHERE l.user_id = $1
+      GROUP BY l.id
+      ORDER BY l.posted_at DESC;
+    `;
+
+    const result = await pool.query(q, [user_id]);
+
+    const withUrls = await Promise.all(
+      result.rows.map(async (row) => {
+        const out = { ...row };
+        if (out.cover_image_url && !out.cover_image_url.startsWith("http")) {
+          try {
+            out.cover_image_url = await generateViewURL(out.cover_image_url);
+          } catch (err) {
+            console.error("Error generating my listing cover url:", err);
+            out.cover_image_url = null;
+          }
+        }
+        return out;
+      })
+    );
+
+    return res.json({ listings: withUrls });
+  } catch (err) {
+    console.error("GET /my-listings error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Update a listing (owner-only): title/price/description/categories and/or is_sold
+app.patch("/listings/:id", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { id: listing_id } = req.params;
+  const { title, price, description, categories, is_sold } = req.body || {};
+
+  try {
+    const ownerRes = await pool.query(
+      `SELECT user_id FROM listings WHERE id = $1`,
+      [listing_id]
+    );
+    if (ownerRes.rows.length === 0) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    if (ownerRes.rows[0].user_id !== user_id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const hasIsSold = await listingsHasIsSoldColumn();
+
+    // Build update query
+    const sets = [];
+    const values = [];
+    let p = 1;
+
+    if (typeof title === "string") {
+      sets.push(`title = $${p++}`);
+      values.push(title.trim());
+    }
+    if (typeof description === "string") {
+      sets.push(`description = $${p++}`);
+      values.push(description.trim());
+    }
+    if (typeof price === "number") {
+      sets.push(`price = $${p++}`);
+      values.push(price);
+    }
+    if (typeof is_sold === "boolean") {
+      if (!hasIsSold) {
+        return res.status(500).json({
+          error:
+            "Database missing listings.is_sold column. Run the migration to add it.",
+        });
+      }
+      sets.push(`is_sold = $${p++}`);
+      values.push(is_sold);
+    }
+
+    if (sets.length > 0) {
+      values.push(listing_id);
+      await pool.query(
+        `UPDATE listings SET ${sets.join(", ")} WHERE id = $${p}`,
+        values
+      );
+    }
+
+    // Replace categories if provided
+    if (Array.isArray(categories)) {
+      await pool.query(`DELETE FROM listing_categories WHERE listing_id = $1`, [
+        listing_id,
+      ]);
+      for (const category_name of categories) {
+        const cRes = await pool.query(
+          `SELECT id FROM categories WHERE name = $1`,
+          [category_name]
+        );
+        let category_id = cRes.rows[0]?.id;
+        if (!category_id) {
+          const ins = await pool.query(
+            `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
+            [category_name]
+          );
+          category_id = ins.rows[0].id;
+        }
+        await pool.query(
+          `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
+          [listing_id, category_id]
+        );
+      }
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /listings/:id error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Delete a listing (owner-only)
+app.delete("/listings/:id", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { id: listing_id } = req.params;
+
+  try {
+    const ownerRes = await pool.query(
+      `SELECT user_id FROM listings WHERE id = $1`,
+      [listing_id]
+    );
+    if (ownerRes.rows.length === 0) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    if (ownerRes.rows[0].user_id !== user_id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Best-effort delete listing images in S3 (only if stored as keys)
+    const imgs = await pool.query(
+      `SELECT image_url FROM listing_images WHERE listing_id = $1`,
+      [listing_id]
+    );
+    for (const r of imgs.rows) {
+      const key = r.image_url;
+      if (
+        key &&
+        typeof key === "string" &&
+        !key.startsWith("http") &&
+        !key.startsWith("blob:")
+      ) {
+        try {
+          await deleteImage(key);
+        } catch (err) {
+          console.error("Failed to delete listing image from S3:", err);
+        }
+      }
+    }
+
+    await pool.query(`DELETE FROM listings WHERE id = $1`, [listing_id]);
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /listings/:id error:", err);
+    return res.status(500).json({ error: "Database error." });
   }
 });
 
@@ -1099,9 +1305,14 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
 
         // listing cover
         convo.listing_cover_url = null;
-        if (convo.listing_cover_key && !convo.listing_cover_key.startsWith("http")) {
+        if (
+          convo.listing_cover_key &&
+          !convo.listing_cover_key.startsWith("http")
+        ) {
           try {
-            convo.listing_cover_url = await generateViewURL(convo.listing_cover_key);
+            convo.listing_cover_url = await generateViewURL(
+              convo.listing_cover_key
+            );
           } catch (err) {
             console.error("Error generating listing cover URL:", err);
           }

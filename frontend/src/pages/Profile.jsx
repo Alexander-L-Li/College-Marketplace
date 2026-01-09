@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { authFetch, logout } from "@/lib/auth";
 
 function Profile() {
   const navigate = useNavigate();
@@ -42,26 +43,10 @@ function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        navigate("/");
-        return;
-      }
-
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem("token");
-          navigate("/");
-          return;
-        }
-        throw new Error("Failed to fetch profile");
-      }
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/profile`
+      );
 
       const data = await res.json();
       setProfile(data);
@@ -104,15 +89,15 @@ function Profile() {
 
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/profile`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(editForm),
-      });
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/profile`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editForm),
+        }
+      );
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -218,8 +203,7 @@ function Profile() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
+    logout(navigate);
   };
 
   if (isLoading) {

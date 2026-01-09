@@ -76,10 +76,10 @@
 
 ### 🖼️ Listings Page (Home Feed)
 
-- [ ] Fetch all listings from DB on load
+- ✅ Fetch listings from DB on load (server-driven)
 - [ ] Display cover image thumbnail
-- [ ] Add search bar with keyword filtering
-- [ ] Sort dropdown (price/name/date)
+- ✅ Add search bar with keyword filtering (server-driven `?search=`)
+- ✅ Sort dropdown (price/name/date) (server-driven `?sort=`)
 - [ ] Display carousel for multiple images per listing
 
 ### 🧠 Discover Page (Future)
@@ -816,6 +816,45 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 - **Navigation**: Home header now uses a **hamburger dropdown** for multiple destinations (Profile + Inbox + Logout), instead of a single profile icon.
 - **Inbox organization**: Inbox is **grouped by listing**, so sellers can manage multiple buyers per listing in one place.
 - **Chat UI**: Conversation thread is styled closer to **iOS/iMessage** (left/right bubbles, timestamps, iOS-like background + composer).
+
+---
+
+## 🔐 **COMPLETED: Auth Hardening + Protected Routes**
+
+### ✅ What we built
+
+- Centralized frontend auth helpers (`frontend/src/lib/auth.js`) to enforce a clean:
+  - **missing/expired token → logout → `/login`**
+  - **401 response → logout → `/login`**
+- Removed remaining hardcoded `http://localhost:3001` usage in pages and standardized on `VITE_API_BASE_URL`.
+
+---
+
+## 🏷️ **COMPLETED: My Listings (Edit / Delete / Mark Sold)**
+
+### ✅ What we built
+
+- New page: **My Listings** for managing your own listings.
+- Owner-only actions:
+  - Edit title/price/description
+  - Mark sold / mark available
+  - Delete listing
+
+### 🔌 Backend
+
+- `GET /my-listings` (JWT)
+- `PATCH /listings/:id` (JWT, owner-only) — supports `title`, `price`, `description`, `categories`, `is_sold`
+- `DELETE /listings/:id` (JWT, owner-only)
+
+### 🖥️ Frontend
+
+- Route: `/my-listings`
+- Page: `frontend/src/pages/MyListings.jsx`
+- Linked from the Home hamburger menu
+
+### 🧱 DB
+
+- Requires `listings.is_sold` (see `.cursor/DB_MIGRATIONS.md`)
 
 ---
 
