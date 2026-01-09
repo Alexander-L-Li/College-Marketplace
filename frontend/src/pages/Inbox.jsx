@@ -61,10 +61,12 @@ export default function Inbox() {
           listing_id: c.listing_id,
           listing_title: c.listing_title,
           listing_cover_url: c.listing_cover_url,
+          unread_count: 0,
           threads: [],
         });
       }
       map.get(key).threads.push(c);
+      map.get(key).unread_count += c.unread_count || 0;
     }
     return Array.from(map.values());
   }, [conversations]);
@@ -119,6 +121,11 @@ export default function Inbox() {
                       {g.threads.length === 1 ? "" : "s"}
                     </div>
                   </div>
+                  {g.unread_count > 0 && (
+                    <div className="min-w-[28px] h-6 px-2 rounded-full bg-blue-600 text-white text-xs font-semibold flex items-center justify-center">
+                      {g.unread_count}
+                    </div>
+                  )}
                 </div>
 
                 <div className="divide-y divide-gray-200">
@@ -138,7 +145,12 @@ export default function Inbox() {
                             {c.last_message_body || "No messages yet. Say hi!"}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500 whitespace-nowrap">
+                        <div className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-2">
+                          {c.unread_count > 0 && (
+                            <span className="min-w-[22px] h-5 px-2 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center">
+                              {c.unread_count}
+                            </span>
+                          )}
                           {c.last_message_at
                             ? new Date(c.last_message_at).toLocaleDateString()
                             : ""}

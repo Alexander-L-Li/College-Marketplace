@@ -797,8 +797,8 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 ### 🔌 Backend API (JWT-protected)
 
 - `POST /conversations` — create or fetch a conversation for `{ listing_id }`
-- `GET /conversations` — inbox list (with listing title + cover + other user + last message)
-- `GET /conversations/:id/messages` — fetch thread
+- `GET /conversations` — inbox list (with listing title + cover + other user + last message + **unread_count**)
+- `GET /conversations/:id/messages` — fetch thread (**marks conversation as read** for current user; returns `other_last_read_at` for read receipts)
 - `POST /conversations/:id/messages` — send message
 
 ### 🖥️ Frontend
@@ -816,6 +816,7 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 - **Navigation**: Home header now uses a **hamburger dropdown** for multiple destinations (Profile + Inbox + Logout), instead of a single profile icon.
 - **Inbox organization**: Inbox is **grouped by listing**, so sellers can manage multiple buyers per listing in one place.
 - **Chat UI**: Conversation thread is styled closer to **iOS/iMessage** (left/right bubbles, timestamps, iOS-like background + composer).
+- **Unread + Read**: Inbox shows unread badges; thread shows a basic “Read” receipt on the last outgoing message.
 
 ---
 

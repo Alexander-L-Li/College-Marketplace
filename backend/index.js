@@ -71,6 +71,28 @@ async function listingsHasIsSoldColumn() {
   }
 }
 
+let _conversationsHasReadColumns = null;
+async function conversationsHasReadColumns() {
+  if (_conversationsHasReadColumns !== null)
+    return _conversationsHasReadColumns;
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_name = 'conversations'
+         AND column_name IN ('last_read_at_buyer', 'last_read_at_seller')
+       GROUP BY table_name
+       HAVING COUNT(*) = 2`
+    );
+    _conversationsHasReadColumns = result.rowCount > 0;
+    return _conversationsHasReadColumns;
+  } catch (err) {
+    console.error("Error checking conversations last_read_at columns:", err);
+    _conversationsHasReadColumns = false;
+    return false;
+  }
+}
+
 // JWT verification middleware
 function jwtMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -1262,6 +1284,8 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
   const user_id = req.user.id;
 
   try {
+    const hasReads = await conversationsHasReadColumns();
+
     const result = await pool.query(
       `
       SELECT
@@ -1282,7 +1306,21 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
         u.last_name AS other_last_name,
         u.profile_image_key AS other_profile_image_key,
         lm.body AS last_message_body,
-        lm.created_at AS last_message_at
+        lm.created_at AS last_message_at,
+        ${
+          hasReads
+            ? `(
+          SELECT COUNT(*)
+          FROM messages m
+          WHERE m.conversation_id = c.id
+            AND m.sender_id <> $1
+            AND m.created_at > COALESCE(
+              CASE WHEN c.buyer_id = $1 THEN c.last_read_at_buyer ELSE c.last_read_at_seller END,
+              TIMESTAMP '1970-01-01'
+            )
+        )::int AS unread_count`
+            : "0::int AS unread_count"
+        }
       FROM conversations c
       JOIN listings l ON l.id = c.listing_id
       JOIN users u ON u.id = CASE WHEN c.buyer_id = $1 THEN c.seller_id ELSE c.buyer_id END
@@ -1352,8 +1390,11 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
   const { id: conversation_id } = req.params;
 
   try {
+    const hasReads = await conversationsHasReadColumns();
     const convoRes = await pool.query(
-      `SELECT id, listing_id, buyer_id, seller_id
+      `SELECT id, listing_id, buyer_id, seller_id${
+        hasReads ? ", last_read_at_buyer, last_read_at_seller" : ""
+      }
        FROM conversations
        WHERE id = $1`,
       [conversation_id]
@@ -1364,6 +1405,28 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
     const convo = convoRes.rows[0];
     if (convo.buyer_id !== user_id && convo.seller_id !== user_id) {
       return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Mark as read when opening the thread (best-effort)
+    let current_last_read_at = null;
+    let other_last_read_at = null;
+    if (hasReads) {
+      const isBuyer = convo.buyer_id === user_id;
+      const now = new Date();
+      current_last_read_at = now.toISOString();
+      other_last_read_at = isBuyer
+        ? convo.last_read_at_seller
+        : convo.last_read_at_buyer;
+      try {
+        await pool.query(
+          `UPDATE conversations
+           SET ${isBuyer ? "last_read_at_buyer" : "last_read_at_seller"} = $1
+           WHERE id = $2`,
+          [now, conversation_id]
+        );
+      } catch (err) {
+        console.error("Failed to update last_read_at:", err);
+      }
     }
 
     const listingRes = await pool.query(
@@ -1389,6 +1452,13 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
         listing_title,
         buyer_id: convo.buyer_id,
         seller_id: convo.seller_id,
+        current_user_id: user_id,
+        other_user_id:
+          convo.buyer_id === user_id ? convo.seller_id : convo.buyer_id,
+        other_last_read_at: other_last_read_at
+          ? new Date(other_last_read_at).toISOString()
+          : null,
+        current_last_read_at,
       },
       messages: msgsRes.rows,
     });

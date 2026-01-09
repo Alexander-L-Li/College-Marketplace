@@ -61,6 +61,26 @@ export default function Conversation() {
     fetchThread();
   }, [id, navigate, token]);
 
+  // Lightweight polling to refresh messages + read state
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/conversations/${id}/messages`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setThread(data.conversation);
+        setMessages(data.messages || []);
+      } catch {
+        // ignore
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [id, token]);
+
   useEffect(() => {
     // Scroll to bottom on load and when messages change
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -135,8 +155,21 @@ export default function Conversation() {
             </div>
           ) : (
             <>
-              {messages.map((m) => {
+              {messages.map((m, idx) => {
                 const isMine = currentUserId && m.sender_id === currentUserId;
+                const isLast = idx === messages.length - 1;
+                const otherReadAt = thread?.other_last_read_at
+                  ? new Date(thread.other_last_read_at).getTime()
+                  : null;
+                const msgAt = m.created_at
+                  ? new Date(m.created_at).getTime()
+                  : null;
+                const showReadReceipt =
+                  isMine &&
+                  isLast &&
+                  otherReadAt &&
+                  msgAt &&
+                  otherReadAt >= msgAt;
                 return (
                   <div
                     key={m.id}
@@ -167,6 +200,11 @@ export default function Conversation() {
                               minute: "2-digit",
                             })
                           : ""}
+                        {showReadReceipt ? (
+                          <span className="ml-2 text-[11px] text-gray-500">
+                            Read
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>

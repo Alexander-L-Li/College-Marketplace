@@ -24,6 +24,22 @@ CREATE INDEX IF NOT EXISTS idx_conversations_seller_id ON conversations(seller_i
 CREATE INDEX IF NOT EXISTS idx_conversations_listing_id ON conversations(listing_id);
 ```
 
+### 1b) Read receipts + unread counts (migration)
+
+We store a **per-user last read timestamp** on the conversation:
+
+```sql
+ALTER TABLE conversations
+ADD COLUMN IF NOT EXISTS last_read_at_buyer TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS last_read_at_seller TIMESTAMP NULL;
+```
+
+Unread count for a user is computed as:
+
+\[
+\#\{m \in messages : m.created_at > last_read_at\_{user} \land m.sender_id \neq user\}
+\]
+
 ### 2) messages
 
 ```sql

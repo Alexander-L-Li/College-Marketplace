@@ -36,3 +36,22 @@ Allow users to mark their own listings as sold (and optionally re-list).
 ALTER TABLE listings
 ADD COLUMN IF NOT EXISTS is_sold BOOLEAN NOT NULL DEFAULT false;
 ```
+
+---
+
+## Migration: messaging unread counts + read receipts
+
+### Goal
+
+Support:
+
+- **Unread counts** per conversation (and aggregations like per listing)
+- **Read receipts** (basic: “other user has read up to time X”)
+
+### SQL
+
+```sql
+ALTER TABLE conversations
+ADD COLUMN IF NOT EXISTS last_read_at_buyer TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS last_read_at_seller TIMESTAMP NULL;
+```
