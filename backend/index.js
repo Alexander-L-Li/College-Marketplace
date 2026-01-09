@@ -281,7 +281,7 @@ app.get("/dorms/:college", async (req, res) => {
 
 // Fetch listings with search and sort
 app.get("/listings", jwtMiddleware, async (req, res) => {
-  const { search, sort } = req.query;
+  const { search, sort, exclude_own } = req.query;
 
   const sortOptions = {
     name_asc: "l.title ASC",
@@ -302,13 +302,27 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     const hasIsSold = await listingsHasIsSoldColumn();
     const selectIsSold = hasIsSold ? ", l.is_sold" : ", false as is_sold";
 
-    let values = [];
-    let whereClause = "";
+    const values = [];
+    const conditions = [];
 
     if (search) {
       values.push(`%${search}%`);
-      whereClause = `WHERE l.title ILIKE $1 OR l.description ILIKE $1 OR c.name ILIKE $1`;
+      const p = values.length;
+      conditions.push(
+        `(l.title ILIKE $${p} OR l.description ILIKE $${p} OR c.name ILIKE $${p})`
+      );
     }
+
+    const shouldExcludeOwn =
+      exclude_own === "1" || exclude_own === "true" || exclude_own === "yes";
+    if (shouldExcludeOwn) {
+      values.push(req.user.id);
+      const p = values.length;
+      conditions.push(`l.user_id <> $${p}`);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const listingsQuery = `
     SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at${selectIsSold}, 

@@ -31,6 +31,8 @@ function Home() {
         const params = new URLSearchParams();
         if (searchQuery.trim()) params.set("search", searchQuery.trim());
         if (sortBy) params.set("sort", sortBy);
+        // Don't show current user's own listings in the marketplace feed
+        params.set("exclude_own", "1");
 
         const url = `${apiBase}/listings?${params.toString()}`;
         const res = await authFetch(navigate, url, {
