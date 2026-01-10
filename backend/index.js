@@ -93,6 +93,22 @@ async function conversationsHasReadColumns() {
   }
 }
 
+let _hasSavedListingsTable = null;
+async function hasSavedListingsTable() {
+  if (_hasSavedListingsTable !== null) return _hasSavedListingsTable;
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`
+    );
+    _hasSavedListingsTable = result.rowCount > 0;
+    return _hasSavedListingsTable;
+  } catch (err) {
+    console.error("Error checking saved_listings table:", err);
+    _hasSavedListingsTable = false;
+    return false;
+  }
+}
+
 // JWT verification middleware
 function jwtMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -301,9 +317,23 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
   try {
     const hasIsSold = await listingsHasIsSoldColumn();
     const selectIsSold = hasIsSold ? ", l.is_sold" : ", false as is_sold";
+    const hasSaved = await hasSavedListingsTable();
+    const selectIsSaved = hasSaved
+      ? `,
+        COALESCE(BOOL_OR(sl.user_id IS NOT NULL), false) AS is_saved`
+      : ", false AS is_saved";
 
     const values = [];
     const conditions = [];
+
+    // If favorites table exists, we join it for this user and also return is_saved.
+    // This consumes $1, so subsequent filters naturally start at $2.
+    const savedJoin = hasSaved
+      ? "LEFT JOIN saved_listings sl ON sl.listing_id = l.id AND sl.user_id = $1"
+      : "";
+    if (hasSaved) {
+      values.push(req.user.id); // $1 reserved for sl.user_id
+    }
 
     if (search) {
       values.push(`%${search}%`);
@@ -325,7 +355,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const listingsQuery = `
-    SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at${selectIsSold}, 
+    SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at${selectIsSold}${selectIsSaved}, 
     u.first_name, u.last_name, u.username, d.name as dorm_name,
     (
     SELECT image_url 
@@ -341,6 +371,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     LEFT JOIN listing_categories lc ON l.id = lc.listing_id
     LEFT JOIN categories c ON lc.category_id = c.id
     LEFT JOIN listing_images i ON l.id = i.listing_id
+    ${savedJoin}
     ${whereClause}
     GROUP BY l.id, u.first_name, u.last_name, u.username, d.name
     ORDER BY ${orderBy};`;
@@ -446,6 +477,125 @@ app.get("/my-listings", jwtMiddleware, async (req, res) => {
     return res.json({ listings: withUrls });
   } catch (err) {
     console.error("GET /my-listings error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Favorites / Saved listings
+app.get("/saved-listings", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  try {
+    const hasSaved = await hasSavedListingsTable();
+    if (!hasSaved) {
+      return res.status(500).json({
+        error:
+          "Database missing saved_listings table. Run the migration to add it.",
+      });
+    }
+
+    const q = `
+      SELECT
+        l.id, l.title, l.price, l.description, l.college, l.posted_at,
+        MAX(s.created_at) AS saved_at,
+        (
+          SELECT image_url
+          FROM listing_images
+          WHERE listing_id = l.id AND is_cover = true
+          LIMIT 1
+        ) AS cover_image_url,
+        u.first_name, u.last_name, u.username,
+        COALESCE(array_remove(array_agg(DISTINCT c.name), NULL), ARRAY[]::text[]) as categories
+      FROM saved_listings s
+      JOIN listings l ON l.id = s.listing_id
+      LEFT JOIN users u ON u.id = l.user_id
+      LEFT JOIN listing_categories lc ON l.id = lc.listing_id
+      LEFT JOIN categories c ON lc.category_id = c.id
+      WHERE s.user_id = $1
+      GROUP BY l.id, u.first_name, u.last_name, u.username
+      ORDER BY saved_at DESC;
+    `;
+
+    const result = await pool.query(q, [user_id]);
+    const withUrls = await Promise.all(
+      result.rows.map(async (row) => {
+        const out = { ...row, is_saved: true };
+        if (out.cover_image_url && !out.cover_image_url.startsWith("http")) {
+          try {
+            out.cover_image_url = await generateViewURL(out.cover_image_url);
+          } catch (err) {
+            console.error("Error generating saved listing cover url:", err);
+            out.cover_image_url = null;
+          }
+        }
+        return out;
+      })
+    );
+
+    return res.json({ listings: withUrls });
+  } catch (err) {
+    console.error("GET /saved-listings error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+app.post("/saved-listings", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { listing_id } = req.body || {};
+
+  if (!listing_id) {
+    return res.status(400).json({ error: "listing_id is required" });
+  }
+
+  try {
+    const hasSaved = await hasSavedListingsTable();
+    if (!hasSaved) {
+      return res.status(500).json({
+        error:
+          "Database missing saved_listings table. Run the migration to add it.",
+      });
+    }
+
+    const exists = await pool.query(`SELECT 1 FROM listings WHERE id = $1`, [
+      listing_id,
+    ]);
+    if (exists.rowCount === 0) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    await pool.query(
+      `INSERT INTO saved_listings (user_id, listing_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, listing_id) DO NOTHING`,
+      [user_id, listing_id]
+    );
+
+    return res.status(200).json({ ok: true, is_saved: true });
+  } catch (err) {
+    console.error("POST /saved-listings error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+app.delete("/saved-listings/:listing_id", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { listing_id } = req.params;
+
+  try {
+    const hasSaved = await hasSavedListingsTable();
+    if (!hasSaved) {
+      return res.status(500).json({
+        error:
+          "Database missing saved_listings table. Run the migration to add it.",
+      });
+    }
+
+    await pool.query(
+      `DELETE FROM saved_listings WHERE user_id = $1 AND listing_id = $2`,
+      [user_id, listing_id]
+    );
+    return res.status(200).json({ ok: true, is_saved: false });
+  } catch (err) {
+    console.error("DELETE /saved-listings/:listing_id error:", err);
     return res.status(500).json({ error: "Database error." });
   }
 });
@@ -1060,11 +1210,15 @@ app.get("/categories", jwtMiddleware, async (req, res) => {
 app.get("/listing/:id", jwtMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const user_id = req.user.id;
 
     // First, get the listing basic info
+    const hasIsSold = await listingsHasIsSoldColumn();
+    const selectIsSold = hasIsSold ? ", l.is_sold" : ", false as is_sold";
+
     const listingResult = await pool.query(
       `SELECT 
-        l.id, l.title, l.price, l.description, l.posted_at, l.user_id,
+        l.id, l.title, l.price, l.description, l.posted_at, l.user_id${selectIsSold},
         u.first_name, u.last_name, u.username, u.college,
         d.name as dorm_name
       FROM listings l
@@ -1079,6 +1233,24 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
     }
 
     const listing = listingResult.rows[0];
+
+    // Favorites (optional): only if saved_listings table exists
+    let is_saved = false;
+    try {
+      const savedExists = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`
+      );
+      if (savedExists.rowCount > 0) {
+        const savedRes = await pool.query(
+          `SELECT 1 FROM saved_listings WHERE user_id = $1 AND listing_id = $2 LIMIT 1`,
+          [user_id, id]
+        );
+        is_saved = savedRes.rowCount > 0;
+      }
+    } catch (err) {
+      // ignore (keep false)
+    }
+    listing.is_saved = is_saved;
 
     // Get categories separately
     const categoriesResult = await pool.query(

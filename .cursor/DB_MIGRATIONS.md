@@ -55,3 +55,25 @@ ALTER TABLE conversations
 ADD COLUMN IF NOT EXISTS last_read_at_buyer TIMESTAMP NULL,
 ADD COLUMN IF NOT EXISTS last_read_at_seller TIMESTAMP NULL;
 ```
+
+---
+
+## Migration: favorites / saved listings
+
+### Goal
+
+Allow users to “save” listings (favorites) and view them later.
+
+### SQL
+
+```sql
+CREATE TABLE IF NOT EXISTS saved_listings (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, listing_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_listings_user_id ON saved_listings(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_listings_listing_id ON saved_listings(listing_id);
+```

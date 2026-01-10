@@ -1,6 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, User, Inbox as InboxIcon, LogOut, Tag } from "lucide-react";
+import {
+  Menu,
+  User,
+  Inbox as InboxIcon,
+  LogOut,
+  Tag,
+  Heart,
+} from "lucide-react";
 import { authFetch, logout } from "@/lib/auth";
 
 function Home() {
@@ -60,6 +67,41 @@ function Home() {
   async function handleLogout(e) {
     e.preventDefault();
     logout(navigate);
+  }
+
+  async function toggleSave(listingId, nextSaved) {
+    try {
+      // optimistic update
+      setListings((prev) =>
+        prev.map((l) =>
+          l.id === listingId ? { ...l, is_saved: nextSaved } : l
+        )
+      );
+      const res = await authFetch(
+        navigate,
+        nextSaved
+          ? `${apiBase}/saved-listings`
+          : `${apiBase}/saved-listings/${listingId}`,
+        nextSaved
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ listing_id: listingId }),
+            }
+          : { method: "DELETE" }
+      );
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+    } catch (err) {
+      // revert on failure
+      setListings((prev) =>
+        prev.map((l) =>
+          l.id === listingId ? { ...l, is_saved: !nextSaved } : l
+        )
+      );
+      setError(err.message || "Failed to update saved state");
+    }
   }
 
   // Close menu on outside click
@@ -124,6 +166,16 @@ function Home() {
                 >
                   <Tag className="w-4 h-4" />
                   My Listings
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/saved");
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm text-black hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Heart className="w-4 h-4" />
+                  Saved
                 </button>
                 <button
                   onClick={(e) => {
@@ -221,6 +273,25 @@ function Home() {
                     {listing.dorm_name && ` • ${listing.dorm_name}`}
                   </p>
                 </div>
+
+                {/* Save button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSave(listing.id, !listing.is_saved);
+                  }}
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label={listing.is_saved ? "Unsave" : "Save"}
+                  title={listing.is_saved ? "Unsave" : "Save"}
+                >
+                  <Heart
+                    className={`w-5 h-5 ${
+                      listing.is_saved
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-400"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           ))

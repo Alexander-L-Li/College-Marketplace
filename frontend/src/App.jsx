@@ -13,6 +13,8 @@ import ListingDetails from "./pages/ListingDetails";
 import Inbox from "./pages/Inbox";
 import Conversation from "./pages/Conversation";
 import MyListings from "./pages/MyListings";
+import EditListing from "./pages/EditListing";
+import SavedListings from "./pages/SavedListings";
 
 import "./App.css";
 
@@ -32,7 +34,9 @@ function App() {
         <Route path="/profile/:id" element={<PublicProfile />} />
         <Route path="/create-listing" element={<CreateListing />} />
         <Route path="/listing/:id" element={<ListingDetails />} />
+        <Route path="/edit-listing/:id" element={<EditListing />} />
         <Route path="/my-listings" element={<MyListings />} />
+        <Route path="/saved" element={<SavedListings />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/inbox/:id" element={<Conversation />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -859,6 +859,59 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 
 ---
 
+## ✏️ **COMPLETED: Edit Listing Page (Owner-only)**
+
+### ✅ What we built
+
+- Owner-only **Edit Listing** flow from the listing details page.
+- Prefills listing data and allows updating:
+  - title / price / description
+  - categories (checkboxes)
+  - sold status toggle (requires `listings.is_sold`)
+
+### 🖥️ Frontend
+
+- Route: `/edit-listing/:id`
+- Page: `frontend/src/pages/EditListing.jsx`
+- `ListingDetails.jsx` “Edit Listing” button now navigates to this page for the owner.
+
+### 🔌 Backend
+
+- Uses existing `PATCH /listings/:id` (owner-only)
+- `GET /listing/:id` now includes `is_sold`
+
+---
+
+## ❤️ **COMPLETED: Favorites / Saved Listings**
+
+### ✅ What we built
+
+- Users can **save/unsave** listings (favorites).
+- Saved state appears:
+  - on Home listing cards
+  - on Listing Details (heart icon)
+- New Saved page to browse saved listings.
+
+### 🧱 DB
+
+- `saved_listings` join table (see `.cursor/DB_MIGRATIONS.md`)
+
+### 🔌 Backend (JWT-protected)
+
+- `GET /saved-listings`
+- `POST /saved-listings` with `{ listing_id }`
+- `DELETE /saved-listings/:listing_id`
+- `GET /listings` includes `is_saved` when the table exists
+- `GET /listing/:id` includes `is_saved` when the table exists
+
+### 🖥️ Frontend
+
+- Route: `/saved`
+- Page: `frontend/src/pages/SavedListings.jsx`
+- Home hamburger menu includes “Saved”
+
+---
+
 ## 🤖 **PLANNED: AI-Powered Listing Generation with OpenAI VLM/CLIP**
 
 ### 🎯 **Feature Overview**

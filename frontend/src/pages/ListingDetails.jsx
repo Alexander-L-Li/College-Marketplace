@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { authFetch, logout } from "@/lib/auth";
+import { Heart } from "lucide-react";
 
 function ListingDetails() {
   const navigate = useNavigate();
@@ -56,6 +57,34 @@ function ListingDetails() {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const toggleSave = async () => {
+    if (!listing) return;
+    const nextSaved = !listing.is_saved;
+    try {
+      setListing((prev) => (prev ? { ...prev, is_saved: nextSaved } : prev));
+      const res = await authFetch(
+        navigate,
+        nextSaved
+          ? `${import.meta.env.VITE_API_BASE_URL}/saved-listings`
+          : `${import.meta.env.VITE_API_BASE_URL}/saved-listings/${listing.id}`,
+        nextSaved
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ listing_id: listing.id }),
+            }
+          : { method: "DELETE" }
+      );
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+    } catch (err) {
+      // revert
+      setListing((prev) => (prev ? { ...prev, is_saved: !nextSaved } : prev));
+      setError(err.message || "Failed to update saved state");
     }
   };
 
@@ -306,7 +335,25 @@ function ListingDetails() {
             {/* Title and Price */}
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-black">{listing.title}</h2>
-              <p className="text-4xl font-bold text-black">${listing.price}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-4xl font-bold text-black">
+                  ${listing.price}
+                </p>
+                <button
+                  onClick={toggleSave}
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label={listing.is_saved ? "Unsave" : "Save"}
+                  title={listing.is_saved ? "Unsave" : "Save"}
+                >
+                  <Heart
+                    className={`w-6 h-6 ${
+                      listing.is_saved
+                        ? "fill-red-500 text-red-500"
+                        : "text-gray-400"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Description */}
@@ -389,7 +436,7 @@ function ListingDetails() {
               {listing.user_id === currentUserId && (
                 <button
                   onClick={() => {
-                    /* TODO: Implement edit listing */
+                    navigate(`/edit-listing/${listing.id}`);
                   }}
                   className="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors text-sm"
                 >
