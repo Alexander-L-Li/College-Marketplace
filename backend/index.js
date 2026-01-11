@@ -174,7 +174,9 @@ async function usersHasProfileImageKeyColumn() {
 
 let _listingsHasIsSoldColumn = null;
 async function listingsHasIsSoldColumn() {
-  if (_listingsHasIsSoldColumn !== null) return _listingsHasIsSoldColumn;
+  // If the column exists, cache that truthy result.
+  // If it doesn't exist yet, DON'T cache false forever (migrations can add it while server is running).
+  if (_listingsHasIsSoldColumn === true) return true;
   try {
     const result = await pool.query(
       `SELECT 1
@@ -182,8 +184,9 @@ async function listingsHasIsSoldColumn() {
        WHERE table_name = 'listings' AND column_name = 'is_sold'
        LIMIT 1`
     );
-    _listingsHasIsSoldColumn = result.rowCount > 0;
-    return _listingsHasIsSoldColumn;
+    const exists = result.rowCount > 0;
+    if (exists) _listingsHasIsSoldColumn = true;
+    return exists;
   } catch (err) {
     console.error("Error checking listings.is_sold column:", err);
     _listingsHasIsSoldColumn = false;
@@ -417,7 +420,7 @@ app.get("/dorms/:college", async (req, res) => {
 
 // Fetch listings with search and sort
 app.get("/listings", jwtMiddleware, async (req, res) => {
-  const { search, sort, exclude_own } = req.query;
+  const { search, sort, exclude_own, include_sold } = req.query;
 
   const sortOptions = {
     name_asc: "l.title ASC",
@@ -469,6 +472,14 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
       values.push(req.user.id);
       const p = values.length;
       conditions.push(`l.user_id <> $${p}`);
+    }
+
+    // Exclude sold listings from the marketplace feed/search by default
+    // (unless include_sold is explicitly requested)
+    const shouldIncludeSold =
+      include_sold === "1" || include_sold === "true" || include_sold === "yes";
+    if (hasIsSold && !shouldIncludeSold) {
+      conditions.push(`l.is_sold = false`);
     }
 
     const whereClause =
@@ -853,6 +864,255 @@ app.delete("/listings/:id", jwtMiddleware, async (req, res) => {
     return res.status(500).json({ error: "Database error." });
   }
 });
+
+// -----------------------------
+// Listing Images (owner-only management)
+// -----------------------------
+
+// Add images to an existing listing (expects S3 keys already uploaded via presigned URLs)
+app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
+  const user_id = req.user.id;
+  const { id: listing_id } = req.params;
+  const body = req.body || {};
+
+  // Support either { image_urls: [{ url, is_cover }]} (matches create listing)
+  // or { images: [{ key, is_cover }]}
+  const incoming = Array.isArray(body.image_urls)
+    ? body.image_urls
+    : Array.isArray(body.images)
+    ? body.images
+    : null;
+
+  if (!incoming || incoming.length === 0) {
+    return res.status(400).json({ error: "No images provided." });
+  }
+
+  try {
+    const ownerRes = await pool.query(
+      `SELECT user_id FROM listings WHERE id = $1`,
+      [listing_id]
+    );
+    if (ownerRes.rows.length === 0) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+    if (ownerRes.rows[0].user_id !== user_id) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const existingCountRes = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM listing_images WHERE listing_id = $1`,
+      [listing_id]
+    );
+    const existingCount = existingCountRes.rows[0]?.count ?? 0;
+    if (existingCount + incoming.length > 6) {
+      return res
+        .status(400)
+        .json({ error: "Cannot upload more than 6 images per listing." });
+    }
+
+    // Determine cover intent
+    const normalized = incoming
+      .map((img) => {
+        const key = img?.key ?? img?.url;
+        return {
+          key,
+          is_cover: !!img?.is_cover,
+        };
+      })
+      .filter(
+        (img) => typeof img.key === "string" && img.key.trim().length > 0
+      );
+
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: "No valid image keys provided." });
+    }
+
+    // If any incoming wants to be cover, only honor the first
+    let coverIdx = normalized.findIndex((x) => x.is_cover);
+    if (coverIdx !== -1) {
+      normalized.forEach((x, i) => (x.is_cover = i === coverIdx));
+    } else {
+      // If there is no existing cover, make first incoming the cover
+      const coverExistsRes = await pool.query(
+        `SELECT 1 FROM listing_images WHERE listing_id = $1 AND is_cover = true LIMIT 1`,
+        [listing_id]
+      );
+      if (coverExistsRes.rowCount === 0) {
+        normalized[0].is_cover = true;
+      }
+    }
+
+    await pool.query("BEGIN");
+
+    // If setting a new cover in this batch, clear existing covers first
+    if (normalized.some((x) => x.is_cover)) {
+      await pool.query(
+        `UPDATE listing_images SET is_cover = false WHERE listing_id = $1`,
+        [listing_id]
+      );
+    }
+
+    for (const img of normalized) {
+      await pool.query(
+        `INSERT INTO listing_images (listing_id, image_url, is_cover)
+         VALUES ($1, $2, $3)`,
+        [listing_id, img.key, img.is_cover]
+      );
+    }
+
+    await pool.query("COMMIT");
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    try {
+      await pool.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    console.error("POST /listings/:id/images error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
+// Set cover image for a listing
+app.patch(
+  "/listings/:listingId/images/:imageId/cover",
+  jwtMiddleware,
+  async (req, res) => {
+    const user_id = req.user.id;
+    const { listingId, imageId } = req.params;
+
+    try {
+      const ownerRes = await pool.query(
+        `SELECT user_id FROM listings WHERE id = $1`,
+        [listingId]
+      );
+      if (ownerRes.rows.length === 0) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      if (ownerRes.rows[0].user_id !== user_id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const imgRes = await pool.query(
+        `SELECT id FROM listing_images WHERE id = $1 AND listing_id = $2`,
+        [imageId, listingId]
+      );
+      if (imgRes.rowCount === 0) {
+        return res.status(404).json({ error: "Image not found" });
+      }
+
+      await pool.query("BEGIN");
+      await pool.query(
+        `UPDATE listing_images SET is_cover = false WHERE listing_id = $1`,
+        [listingId]
+      );
+      await pool.query(
+        `UPDATE listing_images SET is_cover = true WHERE id = $1 AND listing_id = $2`,
+        [imageId, listingId]
+      );
+      await pool.query("COMMIT");
+
+      return res.json({ ok: true });
+    } catch (err) {
+      try {
+        await pool.query("ROLLBACK");
+      } catch {
+        // ignore
+      }
+      console.error(
+        "PATCH /listings/:listingId/images/:imageId/cover error:",
+        err
+      );
+      return res.status(500).json({ error: "Database error." });
+    }
+  }
+);
+
+// Delete a listing image (and best-effort delete the S3 object if stored as a key)
+app.delete(
+  "/listings/:listingId/images/:imageId",
+  jwtMiddleware,
+  async (req, res) => {
+    const user_id = req.user.id;
+    const { listingId, imageId } = req.params;
+
+    try {
+      const ownerRes = await pool.query(
+        `SELECT user_id FROM listings WHERE id = $1`,
+        [listingId]
+      );
+      if (ownerRes.rows.length === 0) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      if (ownerRes.rows[0].user_id !== user_id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await pool.query("BEGIN");
+
+      const imgRes = await pool.query(
+        `SELECT id, image_url, is_cover
+         FROM listing_images
+         WHERE id = $1 AND listing_id = $2`,
+        [imageId, listingId]
+      );
+      if (imgRes.rowCount === 0) {
+        await pool.query("ROLLBACK");
+        return res.status(404).json({ error: "Image not found" });
+      }
+
+      const img = imgRes.rows[0];
+      await pool.query(`DELETE FROM listing_images WHERE id = $1`, [imageId]);
+
+      // If we deleted the cover, ensure another cover exists
+      if (img.is_cover) {
+        const coverExistsRes = await pool.query(
+          `SELECT 1 FROM listing_images WHERE listing_id = $1 AND is_cover = true LIMIT 1`,
+          [listingId]
+        );
+        if (coverExistsRes.rowCount === 0) {
+          const nextRes = await pool.query(
+            `SELECT id FROM listing_images WHERE listing_id = $1 ORDER BY uploaded_at ASC LIMIT 1`,
+            [listingId]
+          );
+          if (nextRes.rowCount > 0) {
+            await pool.query(
+              `UPDATE listing_images SET is_cover = true WHERE id = $1`,
+              [nextRes.rows[0].id]
+            );
+          }
+        }
+      }
+
+      await pool.query("COMMIT");
+
+      // Best-effort S3 delete after DB commit
+      const key = img.image_url;
+      if (
+        key &&
+        typeof key === "string" &&
+        !key.startsWith("http") &&
+        !key.startsWith("blob:")
+      ) {
+        try {
+          await deleteImage(key);
+        } catch (err) {
+          console.error("Failed to delete listing image from S3:", err);
+        }
+      }
+
+      return res.json({ ok: true });
+    } catch (err) {
+      try {
+        await pool.query("ROLLBACK");
+      } catch {
+        // ignore
+      }
+      console.error("DELETE /listings/:listingId/images/:imageId error:", err);
+      return res.status(500).json({ error: "Database error." });
+    }
+  }
+);
 
 // Post new listings
 app.post("/listings", jwtMiddleware, async (req, res) => {

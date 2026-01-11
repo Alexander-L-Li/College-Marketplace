@@ -880,6 +880,7 @@ This is acceptable for local/dev, but for production we should switch SSE auth t
   - title / price / description
   - categories (checkboxes)
   - sold status toggle (requires `listings.is_sold`)
+  - photos (upload/delete/set cover)
 
 ### 🖥️ Frontend
 
@@ -891,6 +892,10 @@ This is acceptable for local/dev, but for production we should switch SSE auth t
 
 - Uses existing `PATCH /listings/:id` (owner-only)
 - `GET /listing/:id` now includes `is_sold`
+- **Listing image management (owner-only)**:
+  - `POST /listings/:id/images` — attach newly uploaded S3 image keys to a listing
+  - `PATCH /listings/:listingId/images/:imageId/cover` — set cover image
+  - `DELETE /listings/:listingId/images/:imageId` — delete image row + best-effort S3 delete (only when stored as S3 key)
 
 ---
 
