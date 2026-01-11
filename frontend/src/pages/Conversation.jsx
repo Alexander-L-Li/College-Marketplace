@@ -16,6 +16,7 @@ export default function Conversation() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
+  const [sseFailed, setSseFailed] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -61,9 +62,86 @@ export default function Conversation() {
     fetchThread();
   }, [id, navigate, token]);
 
-  // Lightweight polling to refresh messages + read state
+  // Realtime (SSE): new messages + read receipts; fallback to light polling if SSE fails.
   useEffect(() => {
     if (!token) return;
+
+    let es;
+    try {
+      es = new EventSource(
+        `${import.meta.env.VITE_API_BASE_URL}/events?token=${encodeURIComponent(
+          token
+        )}`
+      );
+
+      es.addEventListener("message", (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (String(data.conversation_id) !== String(id)) return;
+          const incoming = data.message;
+          if (!incoming?.id) return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === incoming.id)) return prev;
+            // If this is our own outgoing message, SSE might arrive before the POST response.
+            // In that case, replace the pending optimistic bubble instead of appending.
+            if (currentUserId && incoming.sender_id === currentUserId) {
+              const optimisticIdx = prev.findIndex(
+                (m) =>
+                  m._status === "sending" &&
+                  m.sender_id === currentUserId &&
+                  m.body === incoming.body
+              );
+              if (optimisticIdx !== -1) {
+                const next = prev.slice();
+                next[optimisticIdx] = incoming;
+                return next;
+              }
+            }
+            return [...prev, incoming];
+          });
+        } catch {
+          // ignore
+        }
+      });
+
+      es.addEventListener("read", (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (String(data.conversation_id) !== String(id)) return;
+          // Other user read up to read_at
+          setThread((prev) =>
+            prev ? { ...prev, other_last_read_at: data.read_at } : prev
+          );
+        } catch {
+          // ignore
+        }
+      });
+
+      es.onerror = () => {
+        setSseFailed(true);
+        try {
+          es?.close();
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      setSseFailed(true);
+    }
+
+    return () => {
+      try {
+        es?.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [id, token, currentUserId]);
+
+  // Fallback polling if SSE is unavailable
+  useEffect(() => {
+    if (!token) return;
+    if (!sseFailed) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(
@@ -77,19 +155,31 @@ export default function Conversation() {
       } catch {
         // ignore
       }
-    }, 4000);
+    }, 6000);
     return () => clearInterval(interval);
-  }, [id, token]);
+  }, [id, token, sseFailed]);
 
   useEffect(() => {
     // Scroll to bottom on load and when messages change
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  async function handleSend() {
-    if (!draft.trim()) return;
+  async function handleSend(customBody) {
+    const bodyToSend = typeof customBody === "string" ? customBody : draft;
+    if (!bodyToSend.trim()) return;
     setIsSending(true);
     setError("");
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      sender_id: currentUserId,
+      body: bodyToSend,
+      created_at: new Date().toISOString(),
+      _status: "sending",
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    if (!customBody) setDraft("");
 
     try {
       const res = await fetch(
@@ -100,7 +190,7 @@ export default function Conversation() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ body: draft }),
+          body: JSON.stringify({ body: bodyToSend }),
         }
       );
 
@@ -110,9 +200,21 @@ export default function Conversation() {
       }
 
       const data = await res.json();
-      setMessages((prev) => [...prev, data.message]);
-      setDraft("");
+      setMessages((prev) => {
+        const replaced = prev.map((m) => (m.id === tempId ? data.message : m));
+        // De-dupe by id (handles SSE arriving before POST response)
+        const seen = new Set();
+        return replaced.filter((m) => {
+          if (!m?.id) return true;
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+      });
     } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, _status: "failed" } : m))
+      );
       setError(err.message || "Failed to send message");
     } finally {
       setIsSending(false);
@@ -200,6 +302,19 @@ export default function Conversation() {
                               minute: "2-digit",
                             })
                           : ""}
+                        {m._status === "sending" ? (
+                          <span className="ml-2 text-[11px] text-gray-500">
+                            Sending…
+                          </span>
+                        ) : null}
+                        {m._status === "failed" ? (
+                          <button
+                            onClick={() => handleSend(m.body)}
+                            className="ml-2 text-[11px] text-red-600 hover:text-red-700 underline"
+                          >
+                            Retry
+                          </button>
+                        ) : null}
                         {showReadReceipt ? (
                           <span className="ml-2 text-[11px] text-gray-500">
                             Read

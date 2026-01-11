@@ -31,6 +31,126 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+// -----------------------------
+// Realtime (SSE)
+// -----------------------------
+
+const sseClientsByUserId = new Map(); // userId -> Set(res)
+
+function sseWrite(res, event, data) {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function addSseClient(userId, res) {
+  if (!sseClientsByUserId.has(userId)) {
+    sseClientsByUserId.set(userId, new Set());
+  }
+  sseClientsByUserId.get(userId).add(res);
+}
+
+function removeSseClient(userId, res) {
+  const set = sseClientsByUserId.get(userId);
+  if (!set) return;
+  set.delete(res);
+  if (set.size === 0) sseClientsByUserId.delete(userId);
+}
+
+function emitToUser(userId, event, data) {
+  const set = sseClientsByUserId.get(userId);
+  if (!set) return;
+  for (const res of set) {
+    try {
+      sseWrite(res, event, data);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function computeUnreadTotal(userId) {
+  const hasReads = await conversationsHasReadColumns();
+  if (!hasReads) return 0;
+
+  const q = `
+    SELECT COALESCE(SUM(
+      (
+        SELECT COUNT(*)
+        FROM messages m
+        WHERE m.conversation_id = c.id
+          AND m.sender_id <> $1
+          AND m.created_at > COALESCE(
+            CASE WHEN c.buyer_id = $1 THEN c.last_read_at_buyer ELSE c.last_read_at_seller END,
+            TIMESTAMP '1970-01-01'
+          )
+      )
+    ), 0)::int AS total_unread
+    FROM conversations c
+    WHERE c.buyer_id = $1 OR c.seller_id = $1;
+  `;
+  const result = await pool.query(q, [userId]);
+  return result.rows[0]?.total_unread ?? 0;
+}
+
+async function emitUnreadTotal(userId) {
+  try {
+    const total_unread = await computeUnreadTotal(userId);
+    emitToUser(userId, "unread", { total_unread });
+  } catch (err) {
+    console.error("emitUnreadTotal error:", err);
+  }
+}
+
+function getJwtFromRequest(req) {
+  // EventSource cannot set Authorization headers, so we accept token via query param.
+  // NOTE: For production, prefer HttpOnly cookies.
+  const tokenFromQuery = req.query?.token;
+  if (tokenFromQuery && typeof tokenFromQuery === "string")
+    return tokenFromQuery;
+  const tokenFromHeader = req.headers.authorization?.split(" ")[1];
+  if (tokenFromHeader) return tokenFromHeader;
+  return null;
+}
+
+// SSE stream for current user (message/read/unread events)
+app.get("/events", async (req, res) => {
+  try {
+    const token = getJwtFromRequest(req);
+    if (!token) {
+      return res.status(401).send("Missing token");
+    }
+
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = payload.id;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    addSseClient(userId, res);
+
+    sseWrite(res, "connected", { ok: true });
+    await emitUnreadTotal(userId);
+
+    const keepAlive = setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        // ignore
+      }
+    }, 25000);
+
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      removeSseClient(userId, res);
+    });
+  } catch (err) {
+    console.error("GET /events error:", err);
+    return res.status(401).send("Invalid token");
+  }
+});
+
 let _usersHasProfileImageKeyColumn = null;
 async function usersHasProfileImageKeyColumn() {
   if (_usersHasProfileImageKeyColumn !== null) {
@@ -1570,6 +1690,17 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
   }
 });
 
+// Total unread count across all conversations (for global badges)
+app.get("/conversations/unread-count", jwtMiddleware, async (req, res) => {
+  try {
+    const total_unread = await computeUnreadTotal(req.user.id);
+    return res.json({ total_unread });
+  } catch (err) {
+    console.error("GET /conversations/unread-count error:", err);
+    return res.status(500).json({ error: "Database error." });
+  }
+});
+
 // Get messages for a conversation (thread view)
 app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
   const user_id = req.user.id;
@@ -1613,6 +1744,16 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
       } catch (err) {
         console.error("Failed to update last_read_at:", err);
       }
+
+      // Realtime updates: read receipts + unread totals
+      const otherUserId = isBuyer ? convo.seller_id : convo.buyer_id;
+      emitToUser(otherUserId, "read", {
+        conversation_id,
+        reader_id: user_id,
+        read_at: now.toISOString(),
+      });
+      await emitUnreadTotal(user_id);
+      await emitUnreadTotal(otherUserId);
     }
 
     const listingRes = await pool.query(
@@ -1686,7 +1827,33 @@ app.post("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
       [conversation_id, sender_id, body.trim()]
     );
 
-    return res.status(201).json({ message: msgRes.rows[0] });
+    const message = msgRes.rows[0];
+
+    // include sender info (helpful for clients)
+    try {
+      const senderRes = await pool.query(
+        `SELECT username, first_name, last_name FROM users WHERE id = $1`,
+        [sender_id]
+      );
+      const s = senderRes.rows[0];
+      if (s) {
+        message.username = s.username;
+        message.first_name = s.first_name;
+        message.last_name = s.last_name;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Realtime updates: deliver message event to both participants + update unread totals
+    const otherUserId =
+      convo.buyer_id === sender_id ? convo.seller_id : convo.buyer_id;
+    emitToUser(sender_id, "message", { conversation_id, message });
+    emitToUser(otherUserId, "message", { conversation_id, message });
+    await emitUnreadTotal(sender_id);
+    await emitUnreadTotal(otherUserId);
+
+    return res.status(201).json({ message });
   } catch (err) {
     console.error("POST /conversations/:id/messages error:", err);
     return res.status(500).json({ error: "Database error." });

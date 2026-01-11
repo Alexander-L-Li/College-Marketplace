@@ -50,6 +50,29 @@ export default function Inbox() {
     }
 
     fetchInbox();
+
+    // Realtime: refresh inbox when unread totals change (SSE)
+    let es;
+    try {
+      es = new EventSource(
+        `${import.meta.env.VITE_API_BASE_URL}/events?token=${encodeURIComponent(
+          token
+        )}`
+      );
+      es.addEventListener("unread", () => {
+        fetchInbox();
+      });
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      try {
+        es?.close();
+      } catch {
+        // ignore
+      }
+    };
   }, [navigate]);
 
   const groupedByListing = useMemo(() => {

@@ -72,7 +72,7 @@
 - ✅ Implement inbox view (efficient querying)
 - ✅ Build message thread view
 - ✅ Add new message API
-- [ ] Add read receipts / unread counts
+- ✅ Add read receipts / unread counts
 
 ### 🖼️ Listings Page (Home Feed)
 
@@ -374,7 +374,7 @@ Foreign-key constraints:
 - ✅ After successful registration, navigate user to `/EmailVerification` with their user_id as a query param.
 - ✅ Username field in registration form with validation
 - ✅ Display seller usernames in listings
-- [ ] Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
+- ✅ Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
 
 ### General
 
@@ -409,7 +409,7 @@ Foreign-key constraints:
 - ✅ Dorm selection functionality in profile
 - ✅ Profile picture upload interface (UI ready)
 - [ ] Show verification success message after valid entry
-- [ ] Create separate `/login` and `/signup` routes
+- ✅ Create separate `/login` and `/signup` routes
 - [ ] Integrate OpenAI VLM/CLIP for AI-powered listing generation (title, description, categories)
 
 ---
@@ -800,6 +800,8 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 - `GET /conversations` — inbox list (with listing title + cover + other user + last message + **unread_count**)
 - `GET /conversations/:id/messages` — fetch thread (**marks conversation as read** for current user; returns `other_last_read_at` for read receipts)
 - `POST /conversations/:id/messages` — send message
+- `GET /conversations/unread-count` — total unread across all conversations (for global badges)
+- `GET /events?token=...` — **SSE realtime** stream (`message`, `read`, `unread`)
 
 ### 🖥️ Frontend
 
@@ -817,6 +819,16 @@ Allow users to upload a profile picture that is persisted in S3 and shown on:
 - **Inbox organization**: Inbox is **grouped by listing**, so sellers can manage multiple buyers per listing in one place.
 - **Chat UI**: Conversation thread is styled closer to **iOS/iMessage** (left/right bubbles, timestamps, iOS-like background + composer).
 - **Unread + Read**: Inbox shows unread badges; thread shows a basic “Read” receipt on the last outgoing message.
+- **Realtime**: Conversation updates in realtime via SSE; polling remains only as a fallback.
+- **Send UX**: Optimistic send with “Sending…” state + Retry on failure.
+
+### ⚠️ Realtime auth note (important)
+
+SSE uses `EventSource`, which **cannot send Authorization headers**. For now we pass the JWT via query string:
+
+- `GET /events?token=<JWT>`
+
+This is acceptable for local/dev, but for production we should switch SSE auth to **HttpOnly cookies** (so the token never appears in URLs/logs).
 
 ---
 

@@ -20,7 +20,44 @@ function Home() {
   const apiBase = import.meta.env.VITE_API_BASE_URL;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [unreadTotal, setUnreadTotal] = useState(0);
   const searchDebounceRef = useRef(null);
+
+  // Realtime: listen for unread total changes (SSE)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let es;
+    try {
+      es = new EventSource(
+        `${apiBase}/events?token=${encodeURIComponent(token)}`
+      );
+
+      es.addEventListener("unread", (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          setUnreadTotal(data.total_unread || 0);
+        } catch {
+          // ignore
+        }
+      });
+
+      es.addEventListener("connected", () => {
+        // ignore
+      });
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      try {
+        es?.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [apiBase]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,7 +192,12 @@ function Home() {
                   className="w-full px-4 py-3 text-left text-sm text-black hover:bg-gray-50 flex items-center gap-2"
                 >
                   <InboxIcon className="w-4 h-4" />
-                  Inbox
+                  <span className="flex-1">Inbox</span>
+                  {unreadTotal > 0 && (
+                    <span className="min-w-[22px] h-5 px-2 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center">
+                      {unreadTotal}
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => {
