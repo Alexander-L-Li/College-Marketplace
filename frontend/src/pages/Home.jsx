@@ -33,6 +33,8 @@ function CoverThumbnail({ src, alt }) {
 function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name_asc");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -42,6 +44,23 @@ function Home() {
   const [error, setError] = useState("");
   const [unreadTotal, setUnreadTotal] = useState(0);
   const searchDebounceRef = useRef(null);
+
+  const selectableCategories = useMemo(() => {
+    return (categories || []).filter(
+      (c) => c?.name && String(c.name).trim().toLowerCase() !== "other"
+    );
+  }, [categories]);
+
+  const categoryIdsParam = useMemo(() => {
+    if (!selectedCategoryIds.length) return "";
+    return [...selectedCategoryIds].sort().join(",");
+  }, [selectedCategoryIds]);
+
+  function toggleCategory(id) {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   // Realtime: listen for unread total changes (SSE)
   useEffect(() => {
@@ -79,6 +98,25 @@ function Home() {
     };
   }, [apiBase]);
 
+  // Fetch categories for filtering
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await authFetch(navigate, `${apiBase}/categories`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+        // ignore (filter UI is optional)
+      }
+    })();
+    return () => controller.abort();
+  }, [apiBase, navigate]);
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -95,6 +133,7 @@ function Home() {
         const params = new URLSearchParams();
         if (searchQuery.trim()) params.set("search", searchQuery.trim());
         if (sortBy) params.set("sort", sortBy);
+        if (categoryIdsParam) params.set("category_ids", categoryIdsParam);
         // Don't show current user's own listings in the marketplace feed
         params.set("exclude_own", "1");
 
@@ -119,7 +158,7 @@ function Home() {
     }, 250);
 
     return () => controller.abort();
-  }, [apiBase, navigate, searchQuery, sortBy]);
+  }, [apiBase, navigate, searchQuery, sortBy, categoryIdsParam]);
 
   async function handleLogout(e) {
     e.preventDefault();
@@ -264,6 +303,42 @@ function Home() {
             className="w-full pl-3 pr-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
           />
         </div>
+
+        {/* Category Filters */}
+        {selectableCategories.length > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="text-sm font-semibold text-black">
+                Filter by category
+              </div>
+              {selectedCategoryIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryIds([])}
+                  className="text-xs font-semibold text-gray-600 hover:text-black"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {selectableCategories.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex items-center gap-2 text-sm text-black select-none"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-black"
+                    checked={selectedCategoryIds.includes(c.id)}
+                    onChange={() => toggleCategory(c.id)}
+                  />
+                  <span>{c.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Create Listing Button */}
         <div className="flex justify-center">

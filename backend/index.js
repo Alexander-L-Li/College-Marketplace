@@ -420,7 +420,7 @@ app.get("/dorms/:college", async (req, res) => {
 
 // Fetch listings with search and sort
 app.get("/listings", jwtMiddleware, async (req, res) => {
-  const { search, sort, exclude_own, include_sold } = req.query;
+  const { search, sort, exclude_own, include_sold, category_ids } = req.query;
 
   const sortOptions = {
     name_asc: "l.title ASC",
@@ -464,6 +464,39 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
       conditions.push(
         `(l.title ILIKE $${p} OR l.description ILIKE $${p} OR c.name ILIKE $${p})`
       );
+    }
+
+    // Category filter (multi-select). Expects comma-separated UUIDs:
+    // /listings?category_ids=<uuid>,<uuid>
+    if (category_ids) {
+      const raw = Array.isArray(category_ids)
+        ? category_ids.join(",")
+        : String(category_ids);
+      const ids = raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const invalid = ids.find((id) => !uuidRe.test(id));
+      if (invalid) {
+        return res.status(400).send("Invalid category_ids.");
+      }
+
+      if (ids.length > 0) {
+        values.push(ids);
+        const p = values.length;
+        // Use EXISTS so the categories aggregation still returns all categories for the listing
+        conditions.push(
+          `EXISTS (
+            SELECT 1
+            FROM listing_categories lc2
+            WHERE lc2.listing_id = l.id
+              AND lc2.category_id = ANY($${p}::uuid[])
+          )`
+        );
+      }
     }
 
     const shouldExcludeOwn =
