@@ -10,6 +10,26 @@ import {
 } from "lucide-react";
 import { authFetch, logout } from "@/lib/auth";
 
+function CoverThumbnail({ src, alt }) {
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+      {src && !errored ? (
+        <img
+          src={src}
+          alt={alt}
+          className="object-cover w-full h-full"
+          loading="lazy"
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <span className="text-gray-400 text-xs">No Image</span>
+      )}
+    </div>
+  );
+}
+
 function Home() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
@@ -289,17 +309,10 @@ function Home() {
             >
               <div className="flex items-center space-x-4">
                 {/* Cover Image */}
-                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                  {listing.cover_image_url ? (
-                    <img
-                      src={listing.cover_image_url}
-                      alt={listing.title}
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <span className="text-gray-400 text-xs">No Image</span>
-                  )}
-                </div>
+                <CoverThumbnail
+                  src={listing.cover_image_url}
+                  alt={listing.title}
+                />
 
                 {/* Item Info */}
                 <div className="flex-1">

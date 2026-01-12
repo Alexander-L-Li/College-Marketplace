@@ -488,14 +488,23 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
     const listingsQuery = `
     SELECT l.id, l.title, l.price, l.description, l.college, l.posted_at${selectIsSold}${selectIsSaved}, 
     u.first_name, u.last_name, u.username, d.name as dorm_name,
-    (
-    SELECT image_url 
-    FROM listing_images 
-    WHERE listing_id = l.id AND is_cover = true 
-    LIMIT 1
+    COALESCE(
+      (
+        SELECT image_url 
+        FROM listing_images 
+        WHERE listing_id = l.id AND is_cover = true 
+        LIMIT 1
+      ),
+      (
+        SELECT image_url
+        FROM listing_images
+        WHERE listing_id = l.id
+        ORDER BY uploaded_at ASC
+        LIMIT 1
+      )
     ) AS cover_image_url,
-    ARRAY_AGG(DISTINCT c.name) AS categories,
-    ARRAY_AGG(DISTINCT i.image_url) AS images
+    COALESCE(array_remove(array_agg(DISTINCT c.name), NULL), ARRAY[]::text[]) AS categories,
+    COALESCE(array_remove(array_agg(DISTINCT i.image_url), NULL), ARRAY[]::text[]) AS images
     FROM listings l
     LEFT JOIN users u ON l.user_id = u.id
     LEFT JOIN dorms d ON u.dorm_id = d.id

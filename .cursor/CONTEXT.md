@@ -24,34 +24,34 @@
 
 ---
 
-## ✅ Completed Labs & Features
+## Completed Labs & Features
 
 ### Core Labs
 
-- ✅ Project folder + React setup
-- ✅ Tailwind CSS config (mobile-first)
-- ✅ Login/Register UI with single landing page
-- ✅ Home page layout with listings + search
-- ✅ Local PostgreSQL setup
-- ✅ Rebuilt `users` and `listings` tables with enums
+- DONE: Project folder + React setup
+- DONE: Tailwind CSS config (mobile-first)
+- DONE: Login/Register UI with single landing page
+- DONE: Home page layout with listings + search
+- DONE: Local PostgreSQL setup
+- DONE: Rebuilt `users` and `listings` tables with enums
 
 ### Listings & Images
 
-- ✅ `listing_images` table (`is_cover` boolean model)
-- ✅ AWS S3 image upload support (not Supabase Storage)
+- DONE: `listing_images` table (`is_cover` boolean model)
+- DONE: AWS S3 image upload support (not Supabase Storage)
 
 ### Auth & Security
 
-- ✅ Password reset (UUID tokens, email, expiration)
-- ✅ Rate limiting (in-memory)
-- ✅ Forgot password UI
-- ✅ Reset password UI
-- ✅ Email verification system (6-digit code)
-- ✅ `/verify-email` and `/resend-verification` routes
-- ✅ Email verification UI w/ cooldown and redirect
-- ✅ JWT Session Management (token signing, verification, middleware)
-- ✅ Frontend JWT integration (storage, expiration checks, protected routes)
-- ✅ Username system (registration, profile updates, display in listings)
+- DONE: Password reset (UUID tokens, email, expiration)
+- DONE: Rate limiting (in-memory)
+- DONE: Forgot password UI
+- DONE: Reset password UI
+- DONE: Email verification system (6-digit code)
+- DONE: `POST /verify` and `POST /resend-verification` routes (email verification)
+- DONE: Email verification UI w/ cooldown and redirect
+- DONE: JWT Session Management (token signing, verification, middleware)
+- DONE: Frontend JWT integration (storage, expiration checks, protected routes)
+- DONE: Username system (registration, profile updates, display in listings)
 
 ---
 
@@ -59,50 +59,50 @@
 
 ### 🧾 Authentication Labs
 
-- [ ] Add token expiration handling to `/verify-email`
-- [ ] Rate limit `/resend-verification`
-- [ ] Animate Confirm Password field (only shows when typing)
-- ✅ Split login & registration into `/login` and `/signup` pages
-- [ ] Support “Sign in with Google” & “Sign in with Apple”
-- ✅ Email verification success page
+- DONE: Handle verification code expiration in `POST /verify` (checks `expires_at`)
+- DONE: Rate limit `POST /resend-verification` (30s cooldown via `last_sent`)
+- TODO: Animate Confirm Password field (only shows when typing)
+- DONE: Split login & registration into `/login` and `/signup` pages
+- TODO: Support “Sign in with Google” & “Sign in with Apple”
+- DONE: Email verification success page
 
 ### 💬 Messaging System (Lab 18)
 
-- ✅ Design conversations + messages table schema
-- ✅ Implement inbox view (efficient querying)
-- ✅ Build message thread view
-- ✅ Add new message API
-- ✅ Add read receipts / unread counts
+- DONE: Design conversations + messages table schema
+- DONE: Implement inbox view (efficient querying)
+- DONE: Build message thread view
+- DONE: Add new message API
+- DONE: Add read receipts / unread counts
 
 ### 🖼️ Listings Page (Home Feed)
 
-- ✅ Fetch listings from DB on load (server-driven)
-- [ ] Display cover image thumbnail
-- ✅ Add search bar with keyword filtering (server-driven `?search=`)
-- ✅ Sort dropdown (price/name/date) (server-driven `?sort=`)
-- [ ] Display carousel for multiple images per listing
+- DONE: Fetch listings from DB on load (server-driven)
+- DONE: Display cover image thumbnail (uses `cover_image_url` with fallback)
+- DONE: Add search bar with keyword filtering (server-driven `?search=`)
+- DONE: Sort dropdown (price/name/date) (server-driven `?sort=`)
+- TODO: Display carousel for multiple images per listing (already exists on `ListingDetails.jsx`; Home feed carousel is optional)
 
 ### 🧠 Discover Page (Future)
 
-- [ ] Featured listings
-- [ ] Trending categories
-- [ ] Nearby campus deals (geo support optional)
+- TODO: Featured listings
+- TODO: Trending categories
+- TODO: Nearby campus deals (geo support optional)
 
 ### 🤝 Social Features (Post-MVP)
 
-- [ ] Add friending system
-- [ ] Allow comments on listings
-- [ ] Likes/upvotes system
+- TODO: Add friending system
+- TODO: Allow comments on listings
+- TODO: Likes/upvotes system
 
 ### 🤖 AI-Powered Listing Generation (Future)
 
-- [ ] Integrate OpenAI VLM/CLIP for image analysis
-- [ ] Auto-generate listing titles from uploaded images
-- [ ] Auto-generate item descriptions from image analysis
-- [ ] Suggest optimal pricing based on item category and condition
-- [ ] Recommend relevant categories based on image content
-- [ ] FastAPI microservice for ML/image processing (ml-service folder)
-- [ ] User can accept/edit AI-generated suggestions before publishing
+- TODO: Integrate OpenAI VLM/CLIP for image analysis
+- TODO: Auto-generate listing titles from uploaded images
+- TODO: Auto-generate item descriptions from image analysis
+- TODO: Suggest optimal pricing based on item category and condition
+- TODO: Recommend relevant categories based on image content
+- TODO: FastAPI microservice for ML/image processing (ml-service folder)
+- TODO: User can accept/edit AI-generated suggestions before publishing
 
 ---
 
@@ -110,52 +110,52 @@
 
 ### Database
 
-- [ ] Migrate from local Postgres to Supabase
-- [ ] Backup DB schema and seed test data
+- TODO: Migrate from local Postgres to Supabase
+- TODO: Backup DB schema and seed test data
 
 ### DevOps
 
-- [ ] Create Docker Compose for local development
-- [ ] Setup NGINX reverse proxy for Express + FastAPI
-- [ ] Setup GitHub Actions CI/CD
-- [ ] Choose host (Railway / Fly.io / Render)
+- TODO: Create Docker Compose for local development
+- TODO: Setup NGINX reverse proxy for Express + FastAPI
+- TODO: Setup GitHub Actions CI/CD
+- TODO: Choose host (Railway / Fly.io / Render)
 
 ### Production Hosting
 
-- [ ] Vercel for frontend
-- [ ] AWS S3 for image hosting
-- [ ] Backend deployed via container host
+- TODO: Vercel for frontend
+- DONE: AWS S3 for image hosting (S3 upload + presigned view URLs implemented)
+- TODO: Backend deployed via container host
 
 ---
 
 ## 📱 Native App (Future)
 
-- [ ] Convert web app to Swift iOS app
-- [ ] Mobile app connects to same REST API
-- [ ] Add iOS-style UI with native auth
+- TODO: Convert web app to Swift iOS app
+- TODO: Mobile app connects to same REST API
+- TODO: Add iOS-style UI with native auth
 
 ---
 
 ## 🧠 Scalability & Engineering Philosophy
 
-- ✅ Using PostgreSQL for performance and relationships
-- ✅ Rate limiting on sensitive endpoints
-- ✅ Tokens expire (email, password reset)
-- [ ] Index search/filter columns
-- [ ] Optimize query joins (eager loading)
-- [ ] Introduce Redis (future) for sessions/caching
-- [ ] Use FastAPI microservices for ML/image features
-- [ ] OpenAI API integration for VLM/CLIP image analysis
+- DONE: Using PostgreSQL for performance and relationships
+- DONE: Rate limiting on sensitive endpoints
+- DONE: Tokens expire (email, password reset)
+- TODO: Index search/filter columns
+- TODO: Optimize query joins (eager loading)
+- TODO: Introduce Redis (future) for sessions/caching
+- TODO: Use FastAPI microservices for ML/image features
+- TODO: OpenAI API integration for VLM/CLIP image analysis
 
 ---
 
 ## 📬 Email System Summary
 
-- ✅ Gmail SMTP (NodeMailer)
-- ✅ Password reset flow (with expiration)
-- ✅ 6-digit email verification codes
-- ✅ Email resend cooldown
-- [ ] Move to production email (e.g., Mailgun or SES later)
+- DONE: Gmail SMTP (NodeMailer)
+- DONE: Password reset flow (with expiration)
+- DONE: 6-digit email verification codes
+- DONE: Email resend cooldown
+- TODO: Move to production email (e.g., Mailgun or SES later)
 
 ---
 
@@ -362,23 +362,23 @@ Foreign-key constraints:
 
 ### Backend
 
-- ✅ Implement `/verify-email` and `/resend-verification` endpoints.
-- ✅ On registration, generate and email a 6-digit verification code, and create an entry in `email_verification_codes`.
-- ✅ Add rate limiting to `/resend-verification` and `/verify-email` endpoints.
-- ✅ Replace fake session token in `/login` with JWT or real session management.
-- ✅ User profile management (GET /profile, PATCH /profile with username support)
-- [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
+- DONE: Implement `POST /verify` and `POST /resend-verification` endpoints.
+- DONE: On registration, generate and email a 6-digit verification code, and create an entry in `email_verification_codes`.
+- DONE: Add rate limiting to `/resend-verification` and verification attempts (cooldowns + expiry checks).
+- DONE: Replace fake session token in `/login` with JWT or real session management.
+- DONE: User profile management (GET /profile, PATCH /profile with username support)
+- DONE: Apply JWT middleware broadly to protected routes (listings, listing details, profile, categories, saved, messaging, S3, etc.)
 
 ### Frontend
 
-- ✅ After successful registration, navigate user to `/EmailVerification` with their user_id as a query param.
-- ✅ Username field in registration form with validation
-- ✅ Display seller usernames in listings
-- ✅ Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
+- DONE: After successful registration, navigate user to `/EmailVerification` with their user_id as a query param.
+- DONE: Username field in registration form with validation
+- DONE: Display seller usernames in listings
+- DONE: Split login and registration into separate `/login` and `/signup` routes for clarity and better UX.
 
 ### General
 
-- [ ] Ensure all required fields (e.g., `college`) are always available and validated in both frontend and backend.
+- TODO: Ensure all required fields (e.g., `college`) are always available and validated in both frontend and backend.
 
 ---
 
@@ -386,31 +386,31 @@ Foreign-key constraints:
 
 ### Backend
 
-- ✅ Finalize `/verify-email` logic (code checking, expiry)
-- ✅ Add rate limit + cooldown to `/resend-verification`
-- ✅ User profile management with username support
-- ✅ Login accepts email or username (automatic detection)
-- ✅ College-specific dorm system with MIT and Harvard support
-- ✅ Dorm selection in profile updates
-- ✅ Dorm information in listings display
-- [ ] Apply JWT middleware to all protected routes (currently only `/listings` is protected)
-- [ ] Handle token expiration and logout (backend side)
+- DONE: Finalize `POST /verify` logic (code checking + expiry)
+- DONE: Add rate limit + cooldown to `/resend-verification`
+- DONE: User profile management with username support
+- DONE: Login accepts email or username (automatic detection)
+- DONE: College-specific dorm system with MIT and Harvard support
+- DONE: Dorm selection in profile updates
+- DONE: Dorm information in listings display
+- DONE: Apply JWT middleware broadly to protected routes (not just `/listings`)
+- DONE: Handle token expiration (backend returns 401 for invalid/expired tokens; frontend logs out on 401)
 
 ### Frontend
 
-- ✅ Navigate to EmailVerification after successful signup
-- ✅ Username field in registration form
-- ✅ Display seller information in listings
-- ✅ Login with email or username (flexible input field)
-- ✅ Removed confirm password from registration (simplified UX)
-- ✅ Profile page with edit functionality and mobile-first design
-- ✅ Profile icon in Home page header for easy navigation
-- ✅ Enhanced Profile UI with lovable-inspired design
-- ✅ Dorm selection functionality in profile
-- ✅ Profile picture upload interface (UI ready)
-- [ ] Show verification success message after valid entry
-- ✅ Create separate `/login` and `/signup` routes
-- [ ] Integrate OpenAI VLM/CLIP for AI-powered listing generation (title, description, categories)
+- DONE: Navigate to EmailVerification after successful signup
+- DONE: Username field in registration form
+- DONE: Display seller information in listings
+- DONE: Login with email or username (flexible input field)
+- DONE: Removed confirm password from registration (simplified UX)
+- DONE: Profile page with edit functionality and mobile-first design
+- DONE: Profile icon in Home page header for easy navigation
+- DONE: Enhanced Profile UI with lovable-inspired design
+- DONE: Dorm selection functionality in profile
+- DONE: Profile picture upload interface (UI ready)
+- DONE: Show verification success message after valid entry (success state + `/verify-success`)
+- DONE: Create separate `/login` and `/signup` routes
+- TODO: Integrate OpenAI VLM/CLIP for AI-powered listing generation (title, description, categories)
 
 ---
 
@@ -437,8 +437,8 @@ Foreign-key constraints:
 
 **Protected Routes:**
 
-- Currently only `/listings` GET route is protected with `jwtMiddleware`
-- Other routes need middleware applied as needed
+- Most authenticated routes are protected with `jwtMiddleware` (listings, listing details, profile, categories, saved, messaging, S3, etc.)
+- Public routes remain public (e.g. `POST /register`, `POST /login`, `POST /verify`, `POST /resend-verification`)
 
 ### Frontend Implementation
 
@@ -638,14 +638,14 @@ Foreign-key constraints:
 
 ### Recent Updates (June 2024)
 
-- ✅ **Name Change:** Updated "Out of Campus Housing" to "Off-Campus Housing" for better UX
-- ✅ **Display Order:** Added `display_order` column to dorms table for custom sorting
-- ✅ **Bottom Placement:** Configured "Off-Campus Housing" to appear at bottom of dropdown lists
-- ✅ **Alphabetical Sorting:** Regular dorms sorted alphabetically, Off-Campus Housing at bottom
-- ✅ **Listing Creation Form:** Complete frontend form with image upload, form fields, and backend integration
-- ✅ **Categories System:** Populated database with 6 default categories (Electronics, Furniture, Textbooks, Clothing, Appliances, Other)
-- ✅ **Image Upload:** Drag & drop interface with preview grid, up to 6 images, cover image selection
-- ✅ **Form Validation:** Required fields, price validation, category selection, form submission
+- DONE: **Name Change:** Updated "Out of Campus Housing" to "Off-Campus Housing" for better UX
+- DONE: **Display Order:** Added `display_order` column to dorms table for custom sorting
+- DONE: **Bottom Placement:** Configured "Off-Campus Housing" to appear at bottom of dropdown lists
+- DONE: **Alphabetical Sorting:** Regular dorms sorted alphabetically, Off-Campus Housing at bottom
+- DONE: **Listing Creation Form:** Complete frontend form with image upload, form fields, and backend integration
+- DONE: **Categories System:** Populated database with 6 default categories (Electronics, Furniture, Textbooks, Clothing, Appliances, Other)
+- DONE: **Image Upload:** Drag & drop interface with preview grid, up to 6 images, cover image selection
+- DONE: **Form Validation:** Required fields, price validation, category selection, form submission
 
 ### Scalability Features
 
@@ -683,7 +683,7 @@ Foreign-key constraints:
 
 #### **Small Wins (UX/Polish):**
 
-- ✅ **Removed hardcoded college** in listing creation: `CreateListing.jsx` now pulls the user’s `college` from `GET /profile` instead of using a hardcoded value.
+- DONE: **Removed hardcoded college** in listing creation: `CreateListing.jsx` now pulls the user’s `college` from `GET /profile` instead of using a hardcoded value.
 
 ### 🎯 **Technical Features:**
 
@@ -1020,18 +1020,18 @@ Integrate OpenAI's Vision Language Model (VLM) or CLIP to analyze uploaded listi
 
 ### 📋 **Implementation Checklist**
 
-- [ ] Set up OpenAI API key and environment variables
-- [ ] Create FastAPI microservice structure in `/ml-service`
-- [ ] Implement image analysis endpoint (Express or FastAPI)
-- [ ] Design prompt templates for title and description generation
-- [ ] Add "AI Analysis" button to `CreateListing.jsx`
-- [ ] Implement frontend state management for AI suggestions
-- [ ] Add loading states and error handling for AI requests
-- [ ] Add rate limiting for AI analysis endpoint
-- [ ] Test with various item types (electronics, furniture, clothing, etc.)
-- [ ] Optimize API calls (batch processing, caching)
-- [ ] Add user preference to enable/disable AI suggestions
-- [ ] Monitor API costs and usage
+- TODO: Set up OpenAI API key and environment variables
+- TODO: Create FastAPI microservice structure in `/ml-service`
+- TODO: Implement image analysis endpoint (Express or FastAPI)
+- TODO: Design prompt templates for title and description generation
+- TODO: Add "AI Analysis" button to `CreateListing.jsx`
+- TODO: Implement frontend state management for AI suggestions
+- TODO: Add loading states and error handling for AI requests
+- TODO: Add rate limiting for AI analysis endpoint
+- TODO: Test with various item types (electronics, furniture, clothing, etc.)
+- TODO: Optimize API calls (batch processing, caching)
+- TODO: Add user preference to enable/disable AI suggestions
+- TODO: Monitor API costs and usage
 
 ### 🎨 **UI/UX Considerations**
 
