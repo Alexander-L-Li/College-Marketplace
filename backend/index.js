@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const sendEmail = require("./utils/sendEmail");
-const { canRequestReset } = require("./utils/rateLimiter");
+const { canRequestReset, canRequestAI } = require("./utils/rateLimiter");
 const { v4: uuidv4 } = require("uuid");
 const {
   generateUploadURL,
@@ -1625,6 +1625,187 @@ app.get("/categories", jwtMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send("Database error.");
+  }
+});
+
+// AI: recommend listing description from uploaded images (via ml-service)
+app.post("/ai/listing-description", jwtMiddleware, async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const { image_keys, title_hint, category_hints, max_images } =
+      req.body || {};
+
+    const rl = canRequestAI(user_id, { limit: 10, windowMs: 60 * 60 * 1000 }); // 10/hour
+    if (!rl.ok) {
+      return res
+        .status(429)
+        .json({ error: "Too many AI requests. Please try again later." });
+    }
+
+    if (!Array.isArray(image_keys) || image_keys.length < 1) {
+      return res.status(400).json({ error: "image_keys is required." });
+    }
+
+    const limit = Math.max(
+      1,
+      Math.min(6, Number.isFinite(max_images) ? max_images : 1)
+    );
+    const keys = image_keys
+      .filter((k) => typeof k === "string" && k.trim())
+      .slice(0, limit);
+    if (keys.length < 1) {
+      return res.status(400).json({ error: "No valid image_keys provided." });
+    }
+
+    // Generate short-lived view URLs for the microservice.
+    const image_urls = await Promise.all(
+      keys.map(async (k) => {
+        try {
+          return await generateViewURL(k);
+        } catch (err) {
+          console.error("AI generateViewURL error:", err);
+          return null;
+        }
+      })
+    );
+
+    const filteredUrls = image_urls.filter((u) => typeof u === "string" && u);
+    if (filteredUrls.length < 1) {
+      return res.status(400).json({ error: "Failed to generate image URLs." });
+    }
+
+    const mlBase = process.env.ML_SERVICE_URL || "http://localhost:8000";
+    const mlBaseTrimmed = mlBase.endsWith("/") ? mlBase.slice(0, -1) : mlBase;
+    const mlUrl = `${mlBaseTrimmed}/ml/analyze-listing`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
+    let mlRes;
+    try {
+      mlRes = await fetch(mlUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_urls: filteredUrls,
+          title_hint: typeof title_hint === "string" ? title_hint : null,
+          category_hints: Array.isArray(category_hints)
+            ? category_hints.filter((x) => typeof x === "string")
+            : null,
+          // Default provider is configured in ml-service env; can be overridden there.
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!mlRes?.ok) {
+      const t = mlRes ? await mlRes.text() : "No response";
+      return res.status(502).json({ error: "ML service error", detail: t });
+    }
+
+    const data = await mlRes.json();
+    const description = data?.description;
+    if (!description || typeof description !== "string") {
+      return res.status(502).json({ error: "Invalid ML response" });
+    }
+
+    return res.status(200).json({
+      description,
+      provider: data?.provider,
+      model: data?.model,
+      remaining: rl.remaining,
+    });
+  } catch (err) {
+    const msg =
+      err?.name === "AbortError" ? "ML service timed out" : err?.message;
+    console.error("POST /ai/listing-description error:", err);
+    return res.status(500).json({ error: msg || "AI error" });
+  }
+});
+
+// AI: recommend a listing price range based on images + eBay Browse API comps (via ml-service)
+app.post("/ai/listing-price", jwtMiddleware, async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const { image_keys, title_hint, category_hints, max_images } =
+      req.body || {};
+
+    const rl = canRequestAI(user_id, { limit: 10, windowMs: 60 * 60 * 1000 }); // 10/hour
+    if (!rl.ok) {
+      return res
+        .status(429)
+        .json({ error: "Too many AI requests. Please try again later." });
+    }
+
+    if (!Array.isArray(image_keys) || image_keys.length < 1) {
+      return res.status(400).json({ error: "image_keys is required." });
+    }
+
+    const limit = Math.max(
+      1,
+      Math.min(6, Number.isFinite(max_images) ? max_images : 1)
+    );
+    const keys = image_keys
+      .filter((k) => typeof k === "string" && k.trim())
+      .slice(0, limit);
+    if (keys.length < 1) {
+      return res.status(400).json({ error: "No valid image_keys provided." });
+    }
+
+    const image_urls = await Promise.all(
+      keys.map(async (k) => {
+        try {
+          return await generateViewURL(k);
+        } catch (err) {
+          console.error("AI price generateViewURL error:", err);
+          return null;
+        }
+      })
+    );
+    const filteredUrls = image_urls.filter((u) => typeof u === "string" && u);
+    if (filteredUrls.length < 1) {
+      return res.status(400).json({ error: "Failed to generate image URLs." });
+    }
+
+    const mlBase = process.env.ML_SERVICE_URL || "http://localhost:8000";
+    const mlBaseTrimmed = mlBase.endsWith("/") ? mlBase.slice(0, -1) : mlBase;
+    const mlUrl = `${mlBaseTrimmed}/ml/recommend-price`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
+    let mlRes;
+    try {
+      mlRes = await fetch(mlUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_urls: filteredUrls,
+          title_hint: typeof title_hint === "string" ? title_hint : null,
+          category_hints: Array.isArray(category_hints)
+            ? category_hints.filter((x) => typeof x === "string")
+            : null,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!mlRes?.ok) {
+      const t = mlRes ? await mlRes.text() : "No response";
+      return res.status(502).json({ error: "ML service error", detail: t });
+    }
+
+    const data = await mlRes.json();
+    return res.status(200).json({ ...data, remaining: rl.remaining });
+  } catch (err) {
+    const msg =
+      err?.name === "AbortError" ? "ML service timed out" : err?.message;
+    console.error("POST /ai/listing-price error:", err);
+    return res.status(500).json({ error: msg || "AI error" });
   }
 });
 

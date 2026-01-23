@@ -96,12 +96,12 @@
 
 ### 🤖 AI-Powered Listing Generation (Future)
 
-- TODO: Integrate OpenAI VLM/CLIP for image analysis
+- DONE: AI microservice (FastAPI) + backend endpoint + Create Listing UI button to generate a recommended description from uploaded images (Anthropic/OpenAI provider switch)
 - TODO: Auto-generate listing titles from uploaded images
-- TODO: Auto-generate item descriptions from image analysis
-- TODO: Suggest optimal pricing based on item category and condition
+- DONE: Auto-generate a recommended item description from image analysis (cover image by default)
+- DONE: Recommend pricing using LangGraph orchestration + eBay Browse API comps (price range + suggested price)
 - TODO: Recommend relevant categories based on image content
-- TODO: FastAPI microservice for ML/image processing (ml-service folder)
+- DONE: FastAPI microservice for ML/image processing (`ml-service/`)
 - TODO: User can accept/edit AI-generated suggestions before publishing
 
 ---
@@ -993,7 +993,7 @@ Integrate OpenAI's Vision Language Model (VLM) or CLIP to analyze uploaded listi
 #### **User Experience Flow:**
 
 1. User uploads images in listing creation form
-2. After images are uploaded, show "✨ AI Analysis" button
+2. After images are uploaded, show "Generate (AI)" button (recommended description)
 3. User clicks button → Loading state → AI analyzes cover image (or all images)
 4. Form fields auto-populate with AI suggestions
 5. User can:
@@ -1020,14 +1020,14 @@ Integrate OpenAI's Vision Language Model (VLM) or CLIP to analyze uploaded listi
 
 ### 📋 **Implementation Checklist**
 
-- TODO: Set up OpenAI API key and environment variables
-- TODO: Create FastAPI microservice structure in `/ml-service`
-- TODO: Implement image analysis endpoint (Express or FastAPI)
-- TODO: Design prompt templates for title and description generation
-- TODO: Add "AI Analysis" button to `CreateListing.jsx`
-- TODO: Implement frontend state management for AI suggestions
-- TODO: Add loading states and error handling for AI requests
-- TODO: Add rate limiting for AI analysis endpoint
+- TODO: Set up API keys and environment variables (Anthropic recommended first since you have credits)
+- DONE: Create FastAPI microservice structure in `ml-service/`
+- DONE: Implement image analysis endpoint (FastAPI: `POST /ml/analyze-listing`)
+- DONE: Design prompt template for listing description generation
+- DONE: Add "Generate (AI)" button to `CreateListing.jsx`
+- DONE: Implement frontend state management for AI suggestion (fills `description`)
+- DONE: Add loading state + error handling for AI requests
+- DONE: Add rate limiting for AI endpoint (Express: `POST /ai/listing-description`)
 - TODO: Test with various item types (electronics, furniture, clothing, etc.)
 - TODO: Optimize API calls (batch processing, caching)
 - TODO: Add user preference to enable/disable AI suggestions

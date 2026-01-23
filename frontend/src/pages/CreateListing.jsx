@@ -19,6 +19,10 @@ function CreateListing() {
   const [categories, setCategories] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [uploadedImageKeys, setUploadedImageKeys] = useState([]); // Store S3 keys after upload
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [isGeneratingPrice, setIsGeneratingPrice] = useState(false);
+  const [aiPriceInfo, setAiPriceInfo] = useState(null);
 
   // Check authentication on component mount
   useEffect(() => {
@@ -58,6 +62,100 @@ function CreateListing() {
       }
     } catch (err) {
       console.error("Failed to fetch profile college:", err);
+    }
+  };
+
+  const generateDescription = async () => {
+    setAiError("");
+    setError("");
+
+    if (!uploadedImageKeys || uploadedImageKeys.length < 1) {
+      setAiError("Upload at least one image first.");
+      return;
+    }
+
+    setIsGeneratingDesc(true);
+    try {
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/ai/listing-description`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // Keep costs low by defaulting to 1 image (cover/first).
+            image_keys: [uploadedImageKeys[0]],
+            title_hint: formData.title || null,
+            category_hints: formData.categories || null,
+            max_images: 1,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Failed to generate description");
+      }
+
+      const data = await res.json();
+      const desc = data?.description;
+      if (!desc || typeof desc !== "string") {
+        throw new Error("AI returned an invalid description.");
+      }
+
+      setFormData((prev) => ({ ...prev, description: desc }));
+    } catch (err) {
+      setAiError(err.message || "Failed to generate description.");
+    } finally {
+      setIsGeneratingDesc(false);
+    }
+  };
+
+  const generatePrice = async () => {
+    setAiError("");
+    setError("");
+    setAiPriceInfo(null);
+
+    if (!uploadedImageKeys || uploadedImageKeys.length < 1) {
+      setAiError("Upload at least one image first.");
+      return;
+    }
+
+    setIsGeneratingPrice(true);
+    try {
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/ai/listing-price`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_keys: [uploadedImageKeys[0]],
+            title_hint: formData.title || null,
+            category_hints: formData.categories || null,
+            max_images: 1,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Failed to generate price");
+      }
+
+      const data = await res.json();
+      setAiPriceInfo(data);
+
+      if (typeof data?.suggested_price === "number") {
+        setFormData((prev) => ({
+          ...prev,
+          price: String(data.suggested_price),
+        }));
+      }
+    } catch (err) {
+      setAiError(err.message || "Failed to generate price.");
+    } finally {
+      setIsGeneratingPrice(false);
     }
   };
 
@@ -419,12 +517,23 @@ function CreateListing() {
 
             {/* Price Input */}
             <div className="space-y-2">
-              <label
-                htmlFor="price"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Price <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label
+                  htmlFor="price"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Price <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={generatePrice}
+                  disabled={isGeneratingPrice}
+                  className="text-xs font-semibold text-black hover:text-gray-700 disabled:text-gray-400"
+                  title="Recommend a price range using eBay comps"
+                >
+                  {isGeneratingPrice ? "Pricing..." : "Recommend (AI)"}
+                </button>
+              </div>
               <div className="relative">
                 <span className="absolute left-3 top-3 text-gray-500">$</span>
                 <input
@@ -441,16 +550,34 @@ function CreateListing() {
                   required
                 />
               </div>
+              {aiPriceInfo?.low != null && aiPriceInfo?.high != null && (
+                <p className="text-xs text-gray-600">
+                  Suggested range: {aiPriceInfo.currency || "USD"}{" "}
+                  {aiPriceInfo.low} – {aiPriceInfo.high} (
+                  {aiPriceInfo.confidence || "low"} confidence)
+                </p>
+              )}
             </div>
 
             {/* Description Input */}
             <div className="space-y-2">
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Description <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={generateDescription}
+                  disabled={isGeneratingDesc}
+                  className="text-xs font-semibold text-black hover:text-gray-700 disabled:text-gray-400"
+                  title="Generate a recommended description from your uploaded images"
+                >
+                  {isGeneratingDesc ? "Generating..." : "Generate (AI)"}
+                </button>
+              </div>
               <textarea
                 id="description"
                 value={formData.description}
@@ -465,6 +592,11 @@ function CreateListing() {
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none"
                 required
               />
+              {aiError && (
+                <p className="text-sm text-red-600" role="alert">
+                  {aiError}
+                </p>
+              )}
             </div>
 
             {/* Categories Multi-Select */}
