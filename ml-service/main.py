@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 from typing import List, Literal, Optional
 
@@ -11,12 +12,25 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Pricing per 1M tokens (as of Jan 2025)
+PRICING = {
+    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+    "claude-3-5-sonnet-latest": {"input": 3.00, "output": 15.00},
+    "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
+    "gpt-4o": {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+}
+
 PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()  # anthropic | openai
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Reasonable defaults for "recommended description"
-DEFAULT_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "250"))
+DEFAULT_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "200"))
 
 # Models are intentionally configurable so you can swap without code changes.
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
@@ -74,6 +88,20 @@ async def _fetch_image_as_base64(url: str) -> tuple[str, str]:
         return content_type, data
 
 
+def _log_usage(provider: str, model: str, input_tokens: int, output_tokens: int):
+    """Log token usage and estimated cost."""
+    pricing = PRICING.get(model, {"input": 0, "output": 0})
+    input_cost = (input_tokens / 1_000_000) * pricing["input"]
+    output_cost = (output_tokens / 1_000_000) * pricing["output"]
+    total_cost = input_cost + output_cost
+
+    logger.info(
+        f"[{provider.upper()}] Model: {model} | "
+        f"Tokens: {input_tokens} in, {output_tokens} out | "
+        f"Cost: ${total_cost:.6f} (${input_cost:.6f} in + ${output_cost:.6f} out)"
+    )
+
+
 def _parse_json_response(text: str) -> dict:
     """Parse JSON from LLM response, handling markdown code blocks."""
     import json
@@ -125,6 +153,12 @@ async def _call_anthropic(req: AnalyzeListingRequest) -> AnalyzeListingResponse:
             raise HTTPException(status_code=502, detail=f"Anthropic error: {r.text}")
         data = r.json()
 
+    # Log usage and cost
+    usage = data.get("usage", {})
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
+    _log_usage("anthropic", ANTHROPIC_MODEL, input_tokens, output_tokens)
+
     # Typical response shape: content: [{type:"text", text:"..."}]
     parts = data.get("content", [])
     text = ""
@@ -173,6 +207,12 @@ async def _call_openai(req: AnalyzeListingRequest) -> AnalyzeListingResponse:
         if r.status_code >= 400:
             raise HTTPException(status_code=502, detail=f"OpenAI error: {r.text}")
         data = r.json()
+
+    # Log usage and cost
+    usage = data.get("usage", {})
+    input_tokens = usage.get("prompt_tokens", 0)
+    output_tokens = usage.get("completion_tokens", 0)
+    _log_usage("openai", OPENAI_MODEL, input_tokens, output_tokens)
 
     try:
         text = data["choices"][0]["message"]["content"].strip()
