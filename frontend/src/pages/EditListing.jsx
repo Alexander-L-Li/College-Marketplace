@@ -11,7 +11,9 @@ export default function EditListing() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSavingSold, setIsSavingSold] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [aiError, setAiError] = useState("");
 
   const [listing, setListing] = useState(null);
   const [allCategories, setAllCategories] = useState([]);
@@ -246,6 +248,57 @@ export default function EditListing() {
     });
   };
 
+  async function generateListing() {
+    setAiError("");
+    setError("");
+
+    if (!listing?.images?.length) {
+      setAiError("No images available to analyze.");
+      return;
+    }
+
+    // Get the S3 key from the cover image or first image
+    const coverImage = listing.images.find((img) => img.is_cover) || listing.images[0];
+    if (!coverImage?.image_key) {
+      setAiError("Unable to access image for AI analysis.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const res = await authFetch(
+        navigate,
+        `${import.meta.env.VITE_API_BASE_URL}/ai/generate-listing`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_keys: [coverImage.image_key],
+            category_hints: form.categories.length > 0 ? form.categories : null,
+            max_images: 1,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Failed to generate listing details");
+      }
+
+      const data = await res.json();
+      const { title, description } = data || {};
+      if (!title || !description) {
+        throw new Error("AI returned invalid data.");
+      }
+
+      setForm((prev) => ({ ...prev, title, description }));
+    } catch (err) {
+      setAiError(err.message || "Failed to generate listing details.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   async function handleSave() {
     setError("");
     setIsSaving(true);
@@ -373,6 +426,29 @@ export default function EditListing() {
                 </div>
               ) : (
                 <div className="text-sm text-gray-600">No photos yet.</div>
+              )}
+            </div>
+
+            {/* AI Generation */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-black">Generate with AI</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-generate title and description from your photos
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={generateListing}
+                  disabled={isGenerating || !listing?.images?.length}
+                  className="px-4 py-2 text-sm font-semibold bg-black text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isGenerating ? "Generating..." : "Generate"}
+                </button>
+              </div>
+              {aiError && (
+                <p className="text-sm text-red-600 mt-2">{aiError}</p>
               )}
             </div>
 

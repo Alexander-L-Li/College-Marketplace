@@ -1628,12 +1628,11 @@ app.get("/categories", jwtMiddleware, async (req, res) => {
   }
 });
 
-// AI: recommend listing description from uploaded images (via ml-service)
-app.post("/ai/listing-description", jwtMiddleware, async (req, res) => {
+// AI: generate listing title and description from uploaded images (via ml-service)
+app.post("/ai/generate-listing", jwtMiddleware, async (req, res) => {
   try {
     const user_id = req.user.id;
-    const { image_keys, title_hint, category_hints, max_images } =
-      req.body || {};
+    const { image_keys, category_hints, max_images } = req.body || {};
 
     const rl = canRequestAI(user_id, { limit: 10, windowMs: 60 * 60 * 1000 }); // 10/hour
     if (!rl.ok) {
@@ -1688,11 +1687,9 @@ app.post("/ai/listing-description", jwtMiddleware, async (req, res) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image_urls: filteredUrls,
-          title_hint: typeof title_hint === "string" ? title_hint : null,
           category_hints: Array.isArray(category_hints)
             ? category_hints.filter((x) => typeof x === "string")
             : null,
-          // Default provider is configured in ml-service env; can be overridden there.
         }),
         signal: controller.signal,
       });
@@ -1706,12 +1703,13 @@ app.post("/ai/listing-description", jwtMiddleware, async (req, res) => {
     }
 
     const data = await mlRes.json();
-    const description = data?.description;
-    if (!description || typeof description !== "string") {
+    const { title, description } = data || {};
+    if (!title || typeof title !== "string" || !description || typeof description !== "string") {
       return res.status(502).json({ error: "Invalid ML response" });
     }
 
     return res.status(200).json({
+      title,
       description,
       provider: data?.provider,
       model: data?.model,
@@ -1720,7 +1718,7 @@ app.post("/ai/listing-description", jwtMiddleware, async (req, res) => {
   } catch (err) {
     const msg =
       err?.name === "AbortError" ? "ML service timed out" : err?.message;
-    console.error("POST /ai/listing-description error:", err);
+    console.error("POST /ai/generate-listing error:", err);
     return res.status(500).json({ error: msg || "AI error" });
   }
 });
@@ -1793,28 +1791,30 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
     // Convert S3 keys to viewable URLs for images
     listing.images = await Promise.all(
       imagesResult.rows.map(async (img) => {
-        const imageUrl = img.image_url;
+        const imageKey = img.image_url; // This is actually the S3 key stored in DB
 
         // Skip blob URLs (legacy)
-        if (!imageUrl || imageUrl.startsWith("blob:")) {
+        if (!imageKey || imageKey.startsWith("blob:")) {
           return null;
         }
 
         // If it's already a full URL (legacy), return as-is
-        if (imageUrl.startsWith("http")) {
+        if (imageKey.startsWith("http")) {
           return {
             id: img.id,
-            image_url: imageUrl,
+            image_url: imageKey,
+            image_key: null, // No key for legacy URLs
             is_cover: img.is_cover,
           };
         }
 
         // If it's an S3 key, generate presigned URL
         try {
-          const viewURL = await generateViewURL(imageUrl);
+          const viewURL = await generateViewURL(imageKey);
           return {
             id: img.id,
             image_url: viewURL,
+            image_key: imageKey, // Include the S3 key for AI generation
             is_cover: img.is_cover,
           };
         } catch (err) {
@@ -1822,6 +1822,7 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
           return {
             id: img.id,
             image_url: null,
+            image_key: imageKey,
             is_cover: img.is_cover,
           };
         }

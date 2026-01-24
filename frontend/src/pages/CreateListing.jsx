@@ -19,7 +19,7 @@ function CreateListing() {
   const [categories, setCategories] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [uploadedImageKeys, setUploadedImageKeys] = useState([]); // Store S3 keys after upload
-  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState("");
 
   // Check authentication on component mount
@@ -63,7 +63,7 @@ function CreateListing() {
     }
   };
 
-  const generateDescription = async () => {
+  const generateListing = async () => {
     setAiError("");
     setError("");
 
@@ -72,19 +72,17 @@ function CreateListing() {
       return;
     }
 
-    setIsGeneratingDesc(true);
+    setIsGenerating(true);
     try {
       const res = await authFetch(
         navigate,
-        `${import.meta.env.VITE_API_BASE_URL}/ai/listing-description`,
+        `${import.meta.env.VITE_API_BASE_URL}/ai/generate-listing`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // Keep costs low by defaulting to 1 image (cover/first).
             image_keys: [uploadedImageKeys[0].key],
-            title_hint: formData.title || null,
-            category_hints: formData.categories || null,
+            category_hints: formData.categories.length > 0 ? formData.categories : null,
             max_images: 1,
           }),
         },
@@ -92,20 +90,20 @@ function CreateListing() {
 
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(t || "Failed to generate description");
+        throw new Error(t || "Failed to generate listing details");
       }
 
       const data = await res.json();
-      const desc = data?.description;
-      if (!desc || typeof desc !== "string") {
-        throw new Error("AI returned an invalid description.");
+      const { title, description } = data || {};
+      if (!title || !description) {
+        throw new Error("AI returned invalid data.");
       }
 
-      setFormData((prev) => ({ ...prev, description: desc }));
+      setFormData((prev) => ({ ...prev, title, description }));
     } catch (err) {
-      setAiError(err.message || "Failed to generate description.");
+      setAiError(err.message || "Failed to generate listing details.");
     } finally {
-      setIsGeneratingDesc(false);
+      setIsGenerating(false);
     }
   };
 
@@ -439,7 +437,23 @@ function CreateListing() {
         {/* Form Fields Section */}
         {showForm && (
           <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-black">Item Details</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-black">Item Details</h2>
+              <button
+                type="button"
+                onClick={generateListing}
+                disabled={isGenerating}
+                className="px-4 py-2 text-sm font-semibold bg-gray-100 text-black rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-colors"
+              >
+                {isGenerating ? "Generating..." : "Generate with AI"}
+              </button>
+            </div>
+
+            {aiError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-600">{aiError}</p>
+              </div>
+            )}
 
             {/* Title Input */}
             <div className="space-y-2">
@@ -493,23 +507,12 @@ function CreateListing() {
 
             {/* Description Input */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <label
-                  htmlFor="description"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={generateDescription}
-                  disabled={isGeneratingDesc}
-                  className="text-xs font-semibold text-black hover:text-gray-700 disabled:text-gray-400"
-                  title="Generate a recommended description from your uploaded images"
-                >
-                  {isGeneratingDesc ? "Generating..." : "Generate (AI)"}
-                </button>
-              </div>
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Description <span className="text-red-500">*</span>
+              </label>
               <textarea
                 id="description"
                 value={formData.description}
@@ -524,11 +527,6 @@ function CreateListing() {
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none"
                 required
               />
-              {aiError && (
-                <p className="text-sm text-red-600" role="alert">
-                  {aiError}
-                </p>
-              )}
             </div>
 
             {/* Categories Multi-Select */}
