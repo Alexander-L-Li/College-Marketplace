@@ -2,11 +2,14 @@ import base64
 import os
 from typing import List, Literal, Optional
 
+from dotenv import load_dotenv
+
+# Load .env file BEFORE any os.getenv() calls or imports that use env vars
+load_dotenv()
+
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
-
-from price_graph import build_price_graph
 
 PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()  # anthropic | openai
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -21,8 +24,6 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # must support vision i
 
 
 app = FastAPI(title="Dorm Space ML Service", version="0.1.0")
-
-_price_graph = build_price_graph()
 
 
 class AnalyzeListingRequest(BaseModel):
@@ -39,22 +40,6 @@ class AnalyzeListingResponse(BaseModel):
     model: str
 
 
-class RecommendPriceRequest(BaseModel):
-    image_urls: List[HttpUrl] = Field(min_length=1, max_length=6)
-    title_hint: Optional[str] = None
-    category_hints: Optional[List[str]] = None
-
-
-class RecommendPriceResponse(BaseModel):
-    currency: str
-    suggested_price: Optional[float] = None
-    low: Optional[float] = None
-    high: Optional[float] = None
-    confidence: str
-    rationale: str
-    comps_sample: List[dict] = Field(default_factory=list)
-
-
 @app.get("/ml/health")
 def health():
     return {"ok": True, "provider": PROVIDER}
@@ -66,11 +51,13 @@ def _prompt(title_hint: Optional[str], category_hints: Optional[List[str]]) -> s
     cats_line = f"Category hints: {cats}\n" if cats else ""
     return (
         "You write marketplace listings for college students.\n"
-        "Generate a recommended listing description based ONLY on the images.\n"
+        "Generate a listing description based ONLY on the images.\n"
         "Constraints:\n"
         "- 2 short paragraphs max\n"
-        "- Mention key visible features, brand/model if obvious, approximate size, and condition cues\n"
-        "- Avoid hallucinating missing accessories\n"
+        "- Write confidently and assertively. Use direct statements like 'The bag has...' or 'Features include...'. "
+        "NEVER use passive or uncertain language like 'appears to', 'seems to', 'looks like', or 'may have'.\n"
+        "- Mention key visible features, brand/model if obvious, approximate size, and condition\n"
+        "- Only describe what is clearly visible. Do not mention accessories or features you cannot see.\n"
         "- No emojis\n\n"
         f"{title_line}{cats_line}"
     )
@@ -179,29 +166,5 @@ async def analyze_listing(req: AnalyzeListingRequest):
     if provider == "anthropic":
         return await _call_anthropic(req)
     return await _call_openai(req)
-
-
-@app.post("/ml/recommend-price", response_model=RecommendPriceResponse)
-async def recommend_price(req: RecommendPriceRequest):
-    try:
-        result = await _price_graph.ainvoke(
-            {
-                "image_urls": [str(u) for u in req.image_urls],
-                "title_hint": req.title_hint,
-                "category_hints": req.category_hints,
-            }
-        )
-        rec = result.get("recommendation") or {}
-        return RecommendPriceResponse(
-            currency=rec.get("currency") or "USD",
-            suggested_price=rec.get("suggested_price"),
-            low=rec.get("low"),
-            high=rec.get("high"),
-            confidence=rec.get("confidence") or "low",
-            rationale=rec.get("rationale") or "",
-            comps_sample=rec.get("comps_sample") or [],
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Price recommendation failed: {e}")
 
 

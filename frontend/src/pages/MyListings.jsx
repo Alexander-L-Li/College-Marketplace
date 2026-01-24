@@ -92,6 +92,14 @@ export default function MyListings() {
           <div className="w-12" />
         </div>
 
+        {/* Create Listing Button */}
+        <button
+          onClick={() => navigate("/create-listing")}
+          className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2"
+        >
+          + Create New Listing
+        </button>
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="text-red-800 text-sm">{error}</div>

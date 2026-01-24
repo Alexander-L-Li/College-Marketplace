@@ -340,16 +340,6 @@ function Home() {
           </div>
         )}
 
-        {/* Create Listing Button */}
-        <div className="flex justify-center">
-          <button
-            onClick={() => navigate("/create-listing")}
-            className="w-full bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2"
-          >
-            + Create New Listing
-          </button>
-        </div>
-
         {/* Sort Bar */}
         <div className="py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-black">Current Listings</h2>
