@@ -57,6 +57,7 @@ build/
 .parcel-cache/
 .next/
 .nuxt/
+.firebase/
 
 # Temporary files
 tmp/

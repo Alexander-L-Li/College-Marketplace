@@ -22,7 +22,12 @@ function generateSixDigitCode() {
 const CODE_EXPIRY_MS = 30 * 1000;
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://dormspace.xyz"],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
@@ -161,7 +166,7 @@ async function usersHasProfileImageKeyColumn() {
       `SELECT 1
        FROM information_schema.columns
        WHERE table_name = 'users' AND column_name = 'profile_image_key'
-       LIMIT 1`
+       LIMIT 1`,
     );
     _usersHasProfileImageKeyColumn = result.rowCount > 0;
     return _usersHasProfileImageKeyColumn;
@@ -182,7 +187,7 @@ async function listingsHasIsSoldColumn() {
       `SELECT 1
        FROM information_schema.columns
        WHERE table_name = 'listings' AND column_name = 'is_sold'
-       LIMIT 1`
+       LIMIT 1`,
     );
     const exists = result.rowCount > 0;
     if (exists) _listingsHasIsSoldColumn = true;
@@ -205,7 +210,7 @@ async function conversationsHasReadColumns() {
        WHERE table_name = 'conversations'
          AND column_name IN ('last_read_at_buyer', 'last_read_at_seller')
        GROUP BY table_name
-       HAVING COUNT(*) = 2`
+       HAVING COUNT(*) = 2`,
     );
     _conversationsHasReadColumns = result.rowCount > 0;
     return _conversationsHasReadColumns;
@@ -221,7 +226,7 @@ async function hasSavedListingsTable() {
   if (_hasSavedListingsTable !== null) return _hasSavedListingsTable;
   try {
     const result = await pool.query(
-      `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`
+      `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`,
     );
     _hasSavedListingsTable = result.rowCount > 0;
     return _hasSavedListingsTable;
@@ -303,7 +308,7 @@ app.post("/register", async (req, res) => {
       `INSERT INTO users (first_name, last_name, email, college, password, username)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [first_name, last_name, email, college, hashed_password, username.trim()]
+      [first_name, last_name, email, college, hashed_password, username.trim()],
     );
 
     const userId = newUser.rows[0].id;
@@ -313,13 +318,13 @@ app.post("/register", async (req, res) => {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id)
        DO UPDATE SET code = EXCLUDED.code, expires_at = EXCLUDED.expires_at, last_sent = EXCLUDED.last_sent`,
-      [userId, code, expiresAt, now]
+      [userId, code, expiresAt, now],
     );
 
     await sendEmail(
       email,
       "Verify your Dorm Space email",
-      `Enter this 6-digit code to verify your account: ${code}`
+      `Enter this 6-digit code to verify your account: ${code}`,
     );
 
     res.status(200).json({ user_id: userId });
@@ -383,7 +388,7 @@ app.post("/login", async (req, res) => {
       const token = jwt.sign(
         { id: user.id, email: user.email },
         process.env.JWT_SECRET,
-        { expiresIn: "1h" }
+        { expiresIn: "1h" },
       );
       return res.status(200).json({ token: token, email: user.email });
     } else {
@@ -408,7 +413,7 @@ app.get("/dorms/:college", async (req, res) => {
       WHERE c.name = $1 
       ORDER BY d.display_order, d.name
     `,
-      [college]
+      [college],
     );
 
     res.json(result.rows);
@@ -462,7 +467,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
       values.push(`%${search}%`);
       const p = values.length;
       conditions.push(
-        `(l.title ILIKE $${p} OR l.description ILIKE $${p} OR c.name ILIKE $${p})`
+        `(l.title ILIKE $${p} OR l.description ILIKE $${p} OR c.name ILIKE $${p})`,
       );
     }
 
@@ -494,7 +499,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
             FROM listing_categories lc2
             WHERE lc2.listing_id = l.id
               AND lc2.category_id = ANY($${p}::uuid[])
-          )`
+          )`,
         );
       }
     }
@@ -563,7 +568,7 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
         ) {
           try {
             listingCopy.cover_image_url = await generateViewURL(
-              listing.cover_image_url
+              listing.cover_image_url,
             );
           } catch (err) {
             console.error("Error generating cover image URL:", err);
@@ -589,12 +594,12 @@ app.get("/listings", jwtMiddleware, async (req, res) => {
                 }
               }
               return imageUrl;
-            })
+            }),
           );
         }
 
         return listingCopy;
-      })
+      }),
     );
 
     res.json(listingsWithUrls);
@@ -644,7 +649,7 @@ app.get("/my-listings", jwtMiddleware, async (req, res) => {
           }
         }
         return out;
-      })
+      }),
     );
 
     return res.json({ listings: withUrls });
@@ -701,7 +706,7 @@ app.get("/saved-listings", jwtMiddleware, async (req, res) => {
           }
         }
         return out;
-      })
+      }),
     );
 
     return res.json({ listings: withUrls });
@@ -739,7 +744,7 @@ app.post("/saved-listings", jwtMiddleware, async (req, res) => {
       `INSERT INTO saved_listings (user_id, listing_id)
        VALUES ($1, $2)
        ON CONFLICT (user_id, listing_id) DO NOTHING`,
-      [user_id, listing_id]
+      [user_id, listing_id],
     );
 
     return res.status(200).json({ ok: true, is_saved: true });
@@ -764,7 +769,7 @@ app.delete("/saved-listings/:listing_id", jwtMiddleware, async (req, res) => {
 
     await pool.query(
       `DELETE FROM saved_listings WHERE user_id = $1 AND listing_id = $2`,
-      [user_id, listing_id]
+      [user_id, listing_id],
     );
     return res.status(200).json({ ok: true, is_saved: false });
   } catch (err) {
@@ -782,7 +787,7 @@ app.patch("/listings/:id", jwtMiddleware, async (req, res) => {
   try {
     const ownerRes = await pool.query(
       `SELECT user_id FROM listings WHERE id = $1`,
-      [listing_id]
+      [listing_id],
     );
     if (ownerRes.rows.length === 0) {
       return res.status(404).json({ error: "Listing not found" });
@@ -825,7 +830,7 @@ app.patch("/listings/:id", jwtMiddleware, async (req, res) => {
       values.push(listing_id);
       await pool.query(
         `UPDATE listings SET ${sets.join(", ")} WHERE id = $${p}`,
-        values
+        values,
       );
     }
 
@@ -837,19 +842,19 @@ app.patch("/listings/:id", jwtMiddleware, async (req, res) => {
       for (const category_name of categories) {
         const cRes = await pool.query(
           `SELECT id FROM categories WHERE name = $1`,
-          [category_name]
+          [category_name],
         );
         let category_id = cRes.rows[0]?.id;
         if (!category_id) {
           const ins = await pool.query(
             `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
-            [category_name]
+            [category_name],
           );
           category_id = ins.rows[0].id;
         }
         await pool.query(
           `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
-          [listing_id, category_id]
+          [listing_id, category_id],
         );
       }
     }
@@ -869,7 +874,7 @@ app.delete("/listings/:id", jwtMiddleware, async (req, res) => {
   try {
     const ownerRes = await pool.query(
       `SELECT user_id FROM listings WHERE id = $1`,
-      [listing_id]
+      [listing_id],
     );
     if (ownerRes.rows.length === 0) {
       return res.status(404).json({ error: "Listing not found" });
@@ -881,7 +886,7 @@ app.delete("/listings/:id", jwtMiddleware, async (req, res) => {
     // Best-effort delete listing images in S3 (only if stored as keys)
     const imgs = await pool.query(
       `SELECT image_url FROM listing_images WHERE listing_id = $1`,
-      [listing_id]
+      [listing_id],
     );
     for (const r of imgs.rows) {
       const key = r.image_url;
@@ -922,8 +927,8 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
   const incoming = Array.isArray(body.image_urls)
     ? body.image_urls
     : Array.isArray(body.images)
-    ? body.images
-    : null;
+      ? body.images
+      : null;
 
   if (!incoming || incoming.length === 0) {
     return res.status(400).json({ error: "No images provided." });
@@ -932,7 +937,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
   try {
     const ownerRes = await pool.query(
       `SELECT user_id FROM listings WHERE id = $1`,
-      [listing_id]
+      [listing_id],
     );
     if (ownerRes.rows.length === 0) {
       return res.status(404).json({ error: "Listing not found" });
@@ -943,7 +948,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
 
     const existingCountRes = await pool.query(
       `SELECT COUNT(*)::int AS count FROM listing_images WHERE listing_id = $1`,
-      [listing_id]
+      [listing_id],
     );
     const existingCount = existingCountRes.rows[0]?.count ?? 0;
     if (existingCount + incoming.length > 6) {
@@ -962,7 +967,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
         };
       })
       .filter(
-        (img) => typeof img.key === "string" && img.key.trim().length > 0
+        (img) => typeof img.key === "string" && img.key.trim().length > 0,
       );
 
     if (normalized.length === 0) {
@@ -977,7 +982,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
       // If there is no existing cover, make first incoming the cover
       const coverExistsRes = await pool.query(
         `SELECT 1 FROM listing_images WHERE listing_id = $1 AND is_cover = true LIMIT 1`,
-        [listing_id]
+        [listing_id],
       );
       if (coverExistsRes.rowCount === 0) {
         normalized[0].is_cover = true;
@@ -990,7 +995,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
     if (normalized.some((x) => x.is_cover)) {
       await pool.query(
         `UPDATE listing_images SET is_cover = false WHERE listing_id = $1`,
-        [listing_id]
+        [listing_id],
       );
     }
 
@@ -998,7 +1003,7 @@ app.post("/listings/:id/images", jwtMiddleware, async (req, res) => {
       await pool.query(
         `INSERT INTO listing_images (listing_id, image_url, is_cover)
          VALUES ($1, $2, $3)`,
-        [listing_id, img.key, img.is_cover]
+        [listing_id, img.key, img.is_cover],
       );
     }
 
@@ -1026,7 +1031,7 @@ app.patch(
     try {
       const ownerRes = await pool.query(
         `SELECT user_id FROM listings WHERE id = $1`,
-        [listingId]
+        [listingId],
       );
       if (ownerRes.rows.length === 0) {
         return res.status(404).json({ error: "Listing not found" });
@@ -1037,7 +1042,7 @@ app.patch(
 
       const imgRes = await pool.query(
         `SELECT id FROM listing_images WHERE id = $1 AND listing_id = $2`,
-        [imageId, listingId]
+        [imageId, listingId],
       );
       if (imgRes.rowCount === 0) {
         return res.status(404).json({ error: "Image not found" });
@@ -1046,11 +1051,11 @@ app.patch(
       await pool.query("BEGIN");
       await pool.query(
         `UPDATE listing_images SET is_cover = false WHERE listing_id = $1`,
-        [listingId]
+        [listingId],
       );
       await pool.query(
         `UPDATE listing_images SET is_cover = true WHERE id = $1 AND listing_id = $2`,
-        [imageId, listingId]
+        [imageId, listingId],
       );
       await pool.query("COMMIT");
 
@@ -1063,11 +1068,11 @@ app.patch(
       }
       console.error(
         "PATCH /listings/:listingId/images/:imageId/cover error:",
-        err
+        err,
       );
       return res.status(500).json({ error: "Database error." });
     }
-  }
+  },
 );
 
 // Delete a listing image (and best-effort delete the S3 object if stored as a key)
@@ -1081,7 +1086,7 @@ app.delete(
     try {
       const ownerRes = await pool.query(
         `SELECT user_id FROM listings WHERE id = $1`,
-        [listingId]
+        [listingId],
       );
       if (ownerRes.rows.length === 0) {
         return res.status(404).json({ error: "Listing not found" });
@@ -1096,7 +1101,7 @@ app.delete(
         `SELECT id, image_url, is_cover
          FROM listing_images
          WHERE id = $1 AND listing_id = $2`,
-        [imageId, listingId]
+        [imageId, listingId],
       );
       if (imgRes.rowCount === 0) {
         await pool.query("ROLLBACK");
@@ -1110,17 +1115,17 @@ app.delete(
       if (img.is_cover) {
         const coverExistsRes = await pool.query(
           `SELECT 1 FROM listing_images WHERE listing_id = $1 AND is_cover = true LIMIT 1`,
-          [listingId]
+          [listingId],
         );
         if (coverExistsRes.rowCount === 0) {
           const nextRes = await pool.query(
             `SELECT id FROM listing_images WHERE listing_id = $1 ORDER BY uploaded_at ASC LIMIT 1`,
-            [listingId]
+            [listingId],
           );
           if (nextRes.rowCount > 0) {
             await pool.query(
               `UPDATE listing_images SET is_cover = true WHERE id = $1`,
-              [nextRes.rows[0].id]
+              [nextRes.rows[0].id],
             );
           }
         }
@@ -1153,7 +1158,7 @@ app.delete(
       console.error("DELETE /listings/:listingId/images/:imageId error:", err);
       return res.status(500).json({ error: "Database error." });
     }
-  }
+  },
 );
 
 // Post new listings
@@ -1172,14 +1177,14 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
       `INSERT INTO listings (title, price, description, college, user_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-      [title, price, description, college, req.user.id]
+      [title, price, description, college, req.user.id],
     );
     const newListingId = newListingQuery.rows[0].id;
 
     for (let category_name of categories) {
       const categoryQuery = await pool.query(
         `SELECT id FROM categories WHERE name = $1`,
-        [category_name]
+        [category_name],
       );
 
       let category_id;
@@ -1187,7 +1192,7 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
       if (categoryQuery.rows.length === 0) {
         const categoryIdQuery = await pool.query(
           `INSERT INTO categories (name) VALUES ($1) RETURNING id`,
-          [category_name]
+          [category_name],
         );
         category_id = categoryIdQuery.rows[0].id;
       } else {
@@ -1197,7 +1202,7 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
       // always insert into the join table
       await pool.query(
         `INSERT INTO listing_categories (listing_id, category_id) VALUES ($1, $2)`,
-        [newListingId, category_id]
+        [newListingId, category_id],
       );
     }
 
@@ -1207,7 +1212,7 @@ app.post("/listings", jwtMiddleware, async (req, res) => {
       await pool.query(
         `INSERT INTO listing_images (listing_id, image_url, is_cover)
          VALUES ($1, $2, $3)`,
-        [newListingId, image.url, image.is_cover]
+        [newListingId, image.url, image.is_cover],
       );
     }
 
@@ -1241,7 +1246,7 @@ app.post("/forgot-password", async (req, res) => {
       await pool.query(
         `INSERT INTO password_reset_tokens (user_id, token, expires_at)
          VALUES ($1, $2, $3)`,
-        [user_id, token, expiration_time]
+        [user_id, token, expiration_time],
       );
 
       const resetLink = `${process.env.FRONTEND_BASE_URL}/reset-password?token=${token}`;
@@ -1249,7 +1254,7 @@ app.post("/forgot-password", async (req, res) => {
       await sendEmail(
         email,
         "Password Reset for DormSpace",
-        `Link to reset your DormSpace account password: ${resetLink}`
+        `Link to reset your DormSpace account password: ${resetLink}`,
       );
 
       return res.status(200).send("Password reset email sent.");
@@ -1266,7 +1271,7 @@ app.post("/verify", async (req, res) => {
 
   const isverifiedQuery = await pool.query(
     `SELECT is_verified FROM users WHERE id = $1`,
-    [user_id]
+    [user_id],
   );
 
   if (isverifiedQuery.rowCount === 0) {
@@ -1279,7 +1284,7 @@ app.post("/verify", async (req, res) => {
 
   const result = await pool.query(
     `SELECT code, expires_at FROM email_verification_codes WHERE user_id = $1`,
-    [user_id]
+    [user_id],
   );
 
   if (result.rowCount === 0) {
@@ -1309,7 +1314,7 @@ app.post("/resend-verification", async (req, res) => {
 
   const isverifiedQuery = await pool.query(
     `SELECT is_verified FROM users WHERE id = $1`,
-    [user_id]
+    [user_id],
   );
 
   if (isverifiedQuery.rows[0].is_verified === true) {
@@ -1318,7 +1323,7 @@ app.post("/resend-verification", async (req, res) => {
 
   const result = await pool.query(
     `SELECT last_sent FROM email_verification_codes WHERE user_id = $1`,
-    [user_id]
+    [user_id],
   );
 
   if (result.rowCount === 0 || isverifiedQuery.rowCount === 0) {
@@ -1337,7 +1342,7 @@ app.post("/resend-verification", async (req, res) => {
 
   await pool.query(
     `UPDATE email_verification_codes SET code = $1, expires_at = $2, last_sent = $3 WHERE user_id = $4`,
-    [newCode, newExpires, now, user_id]
+    [newCode, newExpires, now, user_id],
   );
 
   const emailQuery = await pool.query(`SELECT email FROM users WHERE id = $1`, [
@@ -1352,7 +1357,7 @@ app.post("/resend-verification", async (req, res) => {
   await sendEmail(
     email,
     "Your new Dorm Space verification code",
-    `Enter this 6-digit code to verify your account: ${newCode}`
+    `Enter this 6-digit code to verify your account: ${newCode}`,
   );
 
   return res.sendStatus(200);
@@ -1370,7 +1375,7 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
        FROM users u 
        LEFT JOIN dorms d ON u.dorm_id = d.id 
        WHERE u.id = $1`,
-      [user_id]
+      [user_id],
     );
 
     if (result.rows.length === 0) {
@@ -1381,7 +1386,7 @@ app.get("/profile", jwtMiddleware, async (req, res) => {
     if (hasAvatar && profile.profile_image_key) {
       try {
         profile.profile_image_url = await generateViewURL(
-          profile.profile_image_key
+          profile.profile_image_key,
         );
       } catch (err) {
         console.error("Error generating profile image URL:", err);
@@ -1411,7 +1416,7 @@ app.get("/profile/:id", jwtMiddleware, async (req, res) => {
        FROM users u
        LEFT JOIN dorms d ON u.dorm_id = d.id
        WHERE u.id = $1`,
-      [id]
+      [id],
     );
 
     if (result.rows.length === 0) {
@@ -1422,7 +1427,7 @@ app.get("/profile/:id", jwtMiddleware, async (req, res) => {
     if (hasAvatar && profile.profile_image_key) {
       try {
         profile.profile_image_url = await generateViewURL(
-          profile.profile_image_key
+          profile.profile_image_key,
         );
       } catch (err) {
         console.error("Error generating public profile image URL:", err);
@@ -1450,7 +1455,7 @@ app.patch("/profile/avatar", jwtMiddleware, async (req, res) => {
       return res
         .status(500)
         .send(
-          "Database missing users.profile_image_key column. Run the migration to add it."
+          "Database missing users.profile_image_key column. Run the migration to add it.",
         );
     }
 
@@ -1462,14 +1467,14 @@ app.patch("/profile/avatar", jwtMiddleware, async (req, res) => {
       return res
         .status(400)
         .send(
-          "Invalid profile_image_key (must be under your profiles/<id>/ prefix)."
+          "Invalid profile_image_key (must be under your profiles/<id>/ prefix).",
         );
     }
 
     // Delete previous avatar if exists (best-effort)
     const previous = await pool.query(
       `SELECT profile_image_key FROM users WHERE id = $1`,
-      [user_id]
+      [user_id],
     );
     const oldKey = previous.rows[0]?.profile_image_key;
 
@@ -1558,7 +1563,7 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
       // Check username uniqueness (excluding current user)
       const existingUser = await pool.query(
         `SELECT id FROM users WHERE username = $1 AND id != $2`,
-        [username.trim(), user_id]
+        [username.trim(), user_id],
       );
       if (existingUser.rows.length > 0) {
         return res
@@ -1581,7 +1586,7 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
         JOIN users u ON u.college = c.name 
         WHERE d.id = $1 AND u.id = $2
       `,
-        [dorm_id, user_id]
+        [dorm_id, user_id],
       );
 
       if (dormCheck.rows.length === 0) {
@@ -1605,7 +1610,7 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
        FROM users u 
        LEFT JOIN dorms d ON u.dorm_id = d.id 
        WHERE u.id = $1`,
-      [user_id]
+      [user_id],
     );
 
     res.json(result.rows[0]);
@@ -1619,7 +1624,7 @@ app.patch("/profile", jwtMiddleware, async (req, res) => {
 app.get("/categories", jwtMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name FROM categories ORDER BY name ASC`
+      `SELECT id, name FROM categories ORDER BY name ASC`,
     );
     res.json(result.rows);
   } catch (err) {
@@ -1647,7 +1652,7 @@ app.post("/ai/generate-listing", jwtMiddleware, async (req, res) => {
 
     const limit = Math.max(
       1,
-      Math.min(6, Number.isFinite(max_images) ? max_images : 1)
+      Math.min(6, Number.isFinite(max_images) ? max_images : 1),
     );
     const keys = image_keys
       .filter((k) => typeof k === "string" && k.trim())
@@ -1665,7 +1670,7 @@ app.post("/ai/generate-listing", jwtMiddleware, async (req, res) => {
           console.error("AI generateViewURL error:", err);
           return null;
         }
-      })
+      }),
     );
 
     const filteredUrls = image_urls.filter((u) => typeof u === "string" && u);
@@ -1704,7 +1709,12 @@ app.post("/ai/generate-listing", jwtMiddleware, async (req, res) => {
 
     const data = await mlRes.json();
     const { title, description } = data || {};
-    if (!title || typeof title !== "string" || !description || typeof description !== "string") {
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !description ||
+      typeof description !== "string"
+    ) {
       return res.status(502).json({ error: "Invalid ML response" });
     }
 
@@ -1742,7 +1752,7 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
       LEFT JOIN users u ON l.user_id = u.id
       LEFT JOIN dorms d ON u.dorm_id = d.id
       WHERE l.id = $1`,
-      [id]
+      [id],
     );
 
     if (listingResult.rows.length === 0) {
@@ -1755,12 +1765,12 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
     let is_saved = false;
     try {
       const savedExists = await pool.query(
-        `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`
+        `SELECT 1 FROM information_schema.tables WHERE table_name = 'saved_listings' LIMIT 1`,
       );
       if (savedExists.rowCount > 0) {
         const savedRes = await pool.query(
           `SELECT 1 FROM saved_listings WHERE user_id = $1 AND listing_id = $2 LIMIT 1`,
-          [user_id, id]
+          [user_id, id],
         );
         is_saved = savedRes.rowCount > 0;
       }
@@ -1775,7 +1785,7 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
        FROM listing_categories lc
        JOIN categories c ON lc.category_id = c.id
        WHERE lc.listing_id = $1`,
-      [id]
+      [id],
     );
     listing.categories = categoriesResult.rows.map((row) => row.name);
 
@@ -1785,7 +1795,7 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
        FROM listing_images
        WHERE listing_id = $1
        ORDER BY is_cover DESC, uploaded_at ASC`,
-      [id]
+      [id],
     );
 
     // Convert S3 keys to viewable URLs for images
@@ -1826,7 +1836,7 @@ app.get("/listing/:id", jwtMiddleware, async (req, res) => {
             is_cover: img.is_cover,
           };
         }
-      })
+      }),
     );
 
     // Filter out null images
@@ -1870,7 +1880,7 @@ app.get("/s3/profile-upload-url", jwtMiddleware, async (req, res) => {
     const { uploadURL, key } = await generateProfileUploadURL(
       req.user.id,
       filename,
-      contentType
+      contentType,
     );
     return res.json({ uploadURL, key });
   } catch (err) {
@@ -1902,8 +1912,8 @@ app.post("/s3/upload-urls", jwtMiddleware, async (req, res) => {
         generateUploadURL(file.filename, file.contentType).then((result) => ({
           uploadURL: result.uploadURL,
           key: result.key,
-        }))
-      )
+        })),
+      ),
     );
 
     return res.json({ uploadUrls });
@@ -1950,7 +1960,7 @@ app.post("/conversations", jwtMiddleware, async (req, res) => {
   try {
     const listingRes = await pool.query(
       `SELECT id, title, user_id FROM listings WHERE id = $1`,
-      [listing_id]
+      [listing_id],
     );
     if (listingRes.rows.length === 0) {
       return res.status(404).json({ error: "Listing not found" });
@@ -1970,7 +1980,7 @@ app.post("/conversations", jwtMiddleware, async (req, res) => {
        ON CONFLICT (listing_id, buyer_id, seller_id)
        DO UPDATE SET listing_id = EXCLUDED.listing_id
        RETURNING id, listing_id, buyer_id, seller_id, created_at`,
-      [listing_id, buyer_id, seller_id]
+      [listing_id, buyer_id, seller_id],
     );
 
     return res.status(200).json({
@@ -2040,7 +2050,7 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
       WHERE c.buyer_id = $1 OR c.seller_id = $1
       ORDER BY lm.created_at DESC NULLS LAST, c.created_at DESC
       `,
-      [user_id]
+      [user_id],
     );
 
     const convos = await Promise.all(
@@ -2055,7 +2065,7 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
         ) {
           try {
             convo.listing_cover_url = await generateViewURL(
-              convo.listing_cover_key
+              convo.listing_cover_key,
             );
           } catch (err) {
             console.error("Error generating listing cover URL:", err);
@@ -2069,7 +2079,7 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
         if (convo.other_profile_image_key) {
           try {
             convo.other_profile_image_url = await generateViewURL(
-              convo.other_profile_image_key
+              convo.other_profile_image_key,
             );
           } catch (err) {
             console.error("Error generating other profile image URL:", err);
@@ -2080,7 +2090,7 @@ app.get("/conversations", jwtMiddleware, async (req, res) => {
         delete convo.listing_cover_key;
 
         return convo;
-      })
+      }),
     );
 
     return res.json({ conversations: convos });
@@ -2114,7 +2124,7 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
       }
        FROM conversations
        WHERE id = $1`,
-      [conversation_id]
+      [conversation_id],
     );
     if (convoRes.rows.length === 0) {
       return res.status(404).json({ error: "Conversation not found" });
@@ -2139,7 +2149,7 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
           `UPDATE conversations
            SET ${isBuyer ? "last_read_at_buyer" : "last_read_at_seller"} = $1
            WHERE id = $2`,
-          [now, conversation_id]
+          [now, conversation_id],
         );
       } catch (err) {
         console.error("Failed to update last_read_at:", err);
@@ -2158,7 +2168,7 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
 
     const listingRes = await pool.query(
       `SELECT id, title FROM listings WHERE id = $1`,
-      [convo.listing_id]
+      [convo.listing_id],
     );
     const listing_title = listingRes.rows[0]?.title || "";
 
@@ -2169,7 +2179,7 @@ app.get("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
        JOIN users u ON u.id = m.sender_id
        WHERE m.conversation_id = $1
        ORDER BY m.created_at ASC`,
-      [conversation_id]
+      [conversation_id],
     );
 
     return res.json({
@@ -2210,7 +2220,7 @@ app.post("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
       `SELECT id, buyer_id, seller_id
        FROM conversations
        WHERE id = $1`,
-      [conversation_id]
+      [conversation_id],
     );
     if (convoRes.rows.length === 0) {
       return res.status(404).json({ error: "Conversation not found" });
@@ -2224,7 +2234,7 @@ app.post("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
       `INSERT INTO messages (conversation_id, sender_id, body)
        VALUES ($1, $2, $3)
        RETURNING id, conversation_id, sender_id, body, created_at`,
-      [conversation_id, sender_id, body.trim()]
+      [conversation_id, sender_id, body.trim()],
     );
 
     const message = msgRes.rows[0];
@@ -2233,7 +2243,7 @@ app.post("/conversations/:id/messages", jwtMiddleware, async (req, res) => {
     try {
       const senderRes = await pool.query(
         `SELECT username, first_name, last_name FROM users WHERE id = $1`,
-        [sender_id]
+        [sender_id],
       );
       const s = senderRes.rows[0];
       if (s) {
